@@ -32,7 +32,7 @@ library(corrplot)
 
 ```{r}
 COVID<-read.csv("covid_19_data.csv")
-COVID_2<-read.csv("COVID19_5-Apr.csv")
+COVID_2<-read.csv("COVID19_6-Apr.csv")
 ```
 
 Format date:
@@ -151,7 +151,14 @@ dygraph(Our_Countries, main = "SARS-COV2-outbreak: Total cases by country", xlab
   dyRangeSelector()
 ```
 
-# Looking for correlations:
+From Day one:
+```{r}
+
+```
+
+
+# Looking for correlations
+
 ```{r}
 fig <- plot_ly(COVID_updated, x = ~Confirmed, y = ~Deaths, z = ~Recovered, width=750) %>% 
   add_markers(text= ~Country.Region ,hoverinfo= "text",
@@ -212,6 +219,8 @@ COVID_3<- COVID_Country %>% inner_join(HDI,by=c("Country.Region"="Country_2")) %
          Recovered_percentage=(Total_Recovered/Total_confirmed)*100)  
 
 COVID_3<-COVID_3[!is.na(COVID_3$Population_2018),]
+
+#write.csv(COVID_3,"COVID_HDI.csv")
 ```
 
 Plot the Human Development Index(HDI) Vs. the number of cases (applying a log transformation), and the proportion of recovered cases:
@@ -235,7 +244,8 @@ COVID_numeric_1<-COVID_3 %>% mutate(Log_cases=log(Cases_million),
                                     Death_percentage=(Total_deaths/Total_confirmed)*100) %>% 
   select(Log_cases,Recovered_percentage,Death_percentage,Year_2018)
 
-corrplot(cor(COVID_numeric_1),method = "number",tl.col="black",tl.srt=15)
+corrplot(cor(COVID_numeric_1),method = "number",tl.col="black",tl.srt=15,
+         col=colorRampPalette(c(rgb(204/255,197/255,126/255),rgb(237/255,105/255,37/255)))(200))
 ```
 
 
