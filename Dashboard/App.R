@@ -13,6 +13,7 @@ Date<-as.Date(COVID_2$Date, format="%m/%d/%y")
 COVID_2$Date2<-Date
 
 COVID_updated<-COVID_2 %>% filter(Date2==max(Date2))
+COVID_3<-read.csv("COVID_HDI.csv")
 
 #=============================================UI=================================================
 header <- dashboardHeader(title = "COVID-19 Outbreak dashboard",
@@ -54,7 +55,11 @@ body <- dashboardBody(
             ),
     tabItem(tabName = "statistics",
             fluidRow(column(width = 6,
-                            box(width = NULL,plotlyOutput("Plot_2")))))
+                            box(width = NULL,plotlyOutput("Plot_2"))),
+                     column(width = 6,
+                            tabBox(width = NULL,
+                                   tabPanel("HDI",plotlyOutput("Plot_3")),
+                                   tabPanel("Tab2")))))
     
   )
 )
@@ -240,6 +245,21 @@ server<-shinyServer(function(session, input, output) {
         zaxis = list(title = 'Recovered'))) 
   })
   
+  HDI_Plot<-reactive({
+    ggplot(data=COVID_3,aes(x=log(Cases_million),y=Year_2018,
+                            size=Recovered_percentage,text=Country.Region)) +
+      geom_point(color="black",fill=rgb(237/255,105/255,37/255),shape=21,alpha=0.6) +
+      scale_size(range = c(3,15), name="Recovered \n percentage") +
+      theme_minimal() + 
+      theme(legend.position="bottom") +
+      labs(title="HDI Vs. logarithmus of COVID-19 cases by million inhabitants \n and proportion of recovered",
+           x="ln(Cases/1M population)",
+           y="HDI")
+  })
+  
+  output$Plot_3<-renderPlotly({
+    ggplotly(HDI_Plot(),tooltip = c("text"))
+  })
   
   
   
