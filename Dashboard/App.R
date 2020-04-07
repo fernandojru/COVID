@@ -15,6 +15,10 @@ COVID_2$Date2<-Date
 COVID_updated<-COVID_2 %>% filter(Date2==max(Date2))
 COVID_3<-read.csv("COVID_HDI.csv")
 
+COVID_numeric_1<-COVID_3 %>% mutate(Log_cases=log(Cases_million),
+                                    Death_percentage=(Total_deaths/Total_confirmed)*100) %>% 
+  select(Log_cases,Recovered_percentage,Death_percentage,Year_2018)
+
 #=============================================UI=================================================
 header <- dashboardHeader(title = "COVID-19 Outbreak dashboard",
                           dropdownMenu(type="notifications",
