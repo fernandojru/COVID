@@ -32,7 +32,7 @@ library(corrplot)
 
 ```{r}
 COVID<-read.csv("covid_19_data.csv")
-COVID_2<-read.csv("COVID19_6-Apr.csv")
+COVID_2<-read.csv("COVID19_7-Apr.csv")
 ```
 
 Format date:
@@ -149,11 +149,6 @@ dygraph(Our_Countries, main = "SARS-COV2-outbreak: Total cases by country", xlab
   dySeries("COVID_Day_series_CostaRica", "Costa Rica",drawPoints = TRUE,
            pointSize = 3,color=rgb(204/255,197/255,126/255)) %>% 
   dyRangeSelector()
-```
-
-From Day one:
-```{r}
-
 ```
 
 
