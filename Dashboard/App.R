@@ -13,11 +13,7 @@ Date<-as.Date(COVID_2$Date, format="%m/%d/%y")
 COVID_2$Date2<-Date
 
 COVID_updated<-COVID_2 %>% filter(Date2==max(Date2))
-COVID_3<-read.csv("COVID_HDI.csv")
-
-COVID_numeric_1<-COVID_3 %>% mutate(Log_cases=log(Cases_million),
-                                    Death_percentage=(Total_deaths/Total_confirmed)*100) %>% 
-  select(Log_cases,Recovered_percentage,Death_percentage,Year_2018)
+COVID_3<-read.csv("COVID_Covariables.csv")
 
 #=============================================UI=================================================
 header <- dashboardHeader(title = "COVID-19 Outbreak dashboard",
@@ -63,7 +59,8 @@ body <- dashboardBody(
                      column(width = 6,
                             tabBox(width = NULL,
                                    tabPanel("HDI",plotlyOutput("Plot_3")),
-                                   tabPanel("Tab2")))))
+                                   tabPanel("Health expenditure",plotlyOutput("Plot_4")),
+                                   tabPanel("Measles",plotlyOutput("Plot_5"))))))
     
   )
 )
@@ -263,6 +260,38 @@ server<-shinyServer(function(session, input, output) {
   
   output$Plot_3<-renderPlotly({
     ggplotly(HDI_Plot(),tooltip = c("text"))
+  })
+  
+  Health_expenditure_Plot<-reactive({
+    ggplot(data=COVID_3,aes(x=log(Cases_million),y=Expenditure_2016,
+                            size=Recovered_percentage,text=Country.Region)) +
+      geom_point(color="black",fill=rgb(204/255,197/255,126/255),shape=21,alpha=0.6) +
+      scale_size(range = c(3,15), name="Recovered \n percentage") +
+      theme_minimal() + 
+      theme(legend.position="bottom") +
+      labs(title="Health expenditure (% of GDP) Vs. logarithmus of COVID-19 cases by million inhabitants \n and proportion of recovered",
+           x="ln(Cases/1M population)",
+           y="% of GDP in health")
+  })
+  
+  output$Plot_4<-renderPlotly({
+    ggplotly(Health_expenditure_Plot(),tooltip = c("text"))
+  })
+  
+  Measles_Plot<-reactive({
+    ggplot(data=COVID_3,aes(x=log(Cases_million),y=Measles_2018,
+                            size=Recovered_percentage,text=Country.Region)) +
+      geom_point(color="black",fill=rgb(120/255,28/255,109/255),shape=21,alpha=0.6) +
+      scale_size(range = c(3,15), name="Recovered \n percentage") +
+      theme_minimal() + 
+      theme(legend.position="bottom") +
+      labs(title="% infants lacking measles immunization Vs. logarithmus of COVID-19 cases by million inhabitants \n and proportion of recovered",
+           x="ln(Cases/1M population)",
+           y="% of infants")
+  })
+  
+  output$Plot_5<-renderPlotly({
+    ggplotly(Measles_Plot(),tooltip = c("text"))
   })
   
   
