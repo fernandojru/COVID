@@ -32,7 +32,7 @@ library(corrplot)
 
 ```{r}
 COVID<-read.csv("covid_19_data.csv")
-COVID_2<-read.csv("COVID19_7-Apr.csv")
+COVID_2<-read.csv("COVID19_8-Apr.csv")
 ```
 
 Format date:
@@ -46,7 +46,7 @@ COVID_2$Date2<-Date
 COVID_updated<-COVID_2 %>% filter(Date2==max(Date2))
 ```
 
-```{r}
+```{r,warning=FALSE,message=FALSE}
 leaflet(width = "100%") %>% 
   addProviderTiles("CartoDB.DarkMatter") %>% 
   setView(lng = 0, lat = 10, zoom = 1.5) %>% 
@@ -96,7 +96,6 @@ COVID_Day_recovered_series<-xts(COVID_2_Day$World_recovered, order.by=COVID_2_Da
 Day_summary<-cbind(COVID_Day_confirmed_series,COVID_Day_deaths_series,COVID_Day_recovered_series)
 ```
 
-
 ```{r}
 dygraph(Day_summary, main = "SARS-COV2-outbreak: Total worldwide cases", 
         xlab="Date", ylab="Total cases",width = 750) %>% 
@@ -105,6 +104,41 @@ dygraph(Day_summary, main = "SARS-COV2-outbreak: Total worldwide cases",
   dySeries("COVID_Day_deaths_series", "Total deaths",drawPoints = TRUE, 
            pointSize = 3, color=rgb(189/255,55/255,48/255)) %>% 
   dySeries("COVID_Day_recovered_series", "Total recovered",drawPoints = TRUE, 
+           pointSize = 3, color=rgb(69/255,136/255,51/255)) %>% 
+  dyRangeSelector()
+```
+
+
+```{r}
+New_count<-function(x)
+{
+  Daily_cases<-numeric(length(x))
+  
+  for(i in length(x):2)
+  {
+    Daily_cases[i]=x[i] - x[i-1]
+  }
+  return(Daily_cases)
+}
+
+New_cases<-New_count(COVID_2_Day$World_confirmed)
+New_deaths<-New_count(COVID_2_Day$World_deaths)
+New_recovered<-New_count(COVID_2_Day$World_recovered)
+COVID_New_confirmed_series<-xts(New_cases, order.by=COVID_2_Day$Date2)
+COVID_New_deaths_series<-xts(New_deaths, order.by=COVID_2_Day$Date2)
+COVID_New_recovered_series<-xts(New_recovered, order.by=COVID_2_Day$Date2)
+
+New_summary<-cbind(COVID_New_confirmed_series,COVID_New_deaths_series,COVID_New_recovered_series)
+```
+
+```{r}
+dygraph(New_summary, main = "SARS-COV2-outbreak: Total worldwide cases", 
+        xlab="Date", ylab="Novel coronavirus cases",width = 750) %>% 
+  dySeries("COVID_New_confirmed_series", "New cases",drawPoints = TRUE, 
+           pointSize = 3, color=rgb(53/255,116/255,199/255)) %>% 
+  dySeries("COVID_New_deaths_series", "New deaths",drawPoints = TRUE, 
+           pointSize = 3, color=rgb(189/255,55/255,48/255)) %>% 
+  dySeries("COVID_New_recovered_series", "New recovered",drawPoints = TRUE, 
            pointSize = 3, color=rgb(69/255,136/255,51/255)) %>% 
   dyRangeSelector()
 ```
@@ -151,6 +185,32 @@ dygraph(Our_Countries, main = "SARS-COV2-outbreak: Total cases by country", xlab
   dyRangeSelector()
 ```
 
+```{r}
+New_Lebanon<-New_count(COVID_2_Day_Lebanon$World_confirmed)
+New_Chile<-New_count(COVID_2_Day_Chile$World_confirmed)
+New_Colombia<-New_count(COVID_2_Day_Colombia$World_confirmed)
+New_CostaRica<-New_count(COVID_2_Day_CostaRica$World_confirmed)
+
+COVID_New_series_Lebanon<-xts(New_Lebanon, order.by=COVID_2_Day_Lebanon$Date2)
+COVID_New_series_Chile<-xts(New_Chile, order.by=COVID_2_Day_Chile$Date2)
+COVID_New_series_Colombia<-xts(New_Colombia, order.by=COVID_2_Day_Colombia$Date2)
+COVID_New_series_CostaRica<-xts(New_CostaRica, order.by=COVID_2_Day_CostaRica$Date2)
+
+Our_New_Countries<-cbind(COVID_New_series_Lebanon,COVID_New_series_Chile,COVID_New_series_Colombia,COVID_New_series_CostaRica)
+```
+
+```{r}
+dygraph(Our_New_Countries, main = "SARS-COV2-outbreak: New cases by country", xlab="Date", ylab="Total cases",width = 750) %>% 
+  dySeries("COVID_New_series_Lebanon", "Lebanon",drawPoints = TRUE, 
+           pointSize = 3, color=rgb(0,0,3/255)) %>% 
+  dySeries("COVID_New_series_Chile", "Chile",drawPoints = TRUE, 
+           pointSize = 3,color=rgb(120/255,28/255,109/255)) %>% 
+  dySeries("COVID_New_series_Colombia", "Colombia",drawPoints = TRUE, 
+           pointSize = 3,color=rgb(237/255,105/255,37/255)) %>% 
+  dySeries("COVID_New_series_CostaRica", "Costa Rica",drawPoints = TRUE,
+           pointSize = 3,color=rgb(204/255,197/255,126/255)) %>% 
+  dyRangeSelector()
+```
 
 # Looking for correlations
 
@@ -334,7 +394,6 @@ ggplotly(plot,tooltip = c("text"),width=750)
 ```
 
 
-
 # Fitting a regression model
 
 ```{r}
@@ -345,9 +404,4 @@ summary(Mod1)
 hist(Mod1$residuals)
 shapiro.test(Mod1$residuals)
 ```
-
-
-
-
-
 
