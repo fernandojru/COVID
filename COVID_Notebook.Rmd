@@ -32,7 +32,7 @@ library(corrplot)
 
 ```{r}
 COVID<-read.csv("covid_19_data.csv")
-COVID_2<-read.csv("COVID19_8-Apr.csv")
+COVID_2<-read.csv("COVID19_9-Apr.csv")
 ```
 
 Format date:
@@ -320,8 +320,6 @@ Measles$Country_2[Measles$Country_2=="Korea"]<-"South Korea"
 
 ```{r}
 COVID_3<- COVID_3 %>% inner_join(Measles,by=c("Country.Region"="Country_2")) %>% select(-c("Country"))
-
-#write.csv(COVID_3,"COVID_Covariables.csv")
 ```
 
 
