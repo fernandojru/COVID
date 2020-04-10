@@ -1,0 +1,257 @@
+---
+title: "COVID-19 Outbreak: Worldwide analysis"
+author: "Rodriguez, Fernando"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float:
+      collapsed: true
+      smooth_scroll: true
+    theme: cosmo
+     
+---
+![](Coronavirus.jpg)
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+#library(nCov2019)
+library(leaflet)
+library(dplyr)
+library(ggplot2)
+library(plotly)
+library(scales)
+library(xts)
+library(dygraphs)
+library(corrplot)
+library(forecast)
+```
+
+# Quick overview
+
+## Current status
+
+```{r,echo=FALSE}
+COVID<-read.csv("covid_19_data.csv")
+COVID_2<-read.csv("COVID19_7-Apr.csv")
+```
+
+Format date:
+```{r,echo=FALSE}
+Date<-as.Date(COVID_2$Date, format="%m/%d/%y") 
+
+COVID_2$Date2<-Date
+```
+
+```{r,echo=FALSE}
+COVID_updated<-COVID_2 %>% filter(Date2==max(Date2))
+```
+
+```{r,echo=FALSE}
+leaflet(width = "100%") %>% 
+  addProviderTiles("CartoDB.DarkMatter") %>% 
+  setView(lng = 0, lat = 10, zoom = 1.5) %>% 
+  addCircleMarkers(data = COVID_updated, 
+                   lng = ~ Long,
+                   lat = ~ Lat,
+                   radius = ~ log(Confirmed+1),
+                   color = rgb(218/255,65/255,56/255),
+                   fillOpacity = ~ ifelse(Confirmed > 0, 1, 0),
+                   stroke = FALSE,
+                   label = ~ paste(Province.State,",",Country.Region, ": ", Confirmed)
+                   )
+```
+
+Time distribution:
+```{r,echo=FALSE}
+COVID_2_Day<- COVID_2 %>% group_by(Date2) %>% summarise(World_confirmed=sum(Confirmed),
+                                                        World_deaths=sum(Deaths),
+                                                        World_recovered=sum(Recovered))
+
+
+COVID_Day_confirmed_series<-xts(COVID_2_Day$World_confirmed, order.by=COVID_2_Day$Date2)
+COVID_Day_deaths_series<-xts(COVID_2_Day$World_deaths, order.by=COVID_2_Day$Date2)
+COVID_Day_recovered_series<-xts(COVID_2_Day$World_recovered, order.by=COVID_2_Day$Date2)
+
+Day_summary<-cbind(COVID_Day_confirmed_series,COVID_Day_deaths_series,COVID_Day_recovered_series)
+```
+
+
+```{r,echo=FALSE}
+dygraph(Day_summary, main = "SARS-COV2-outbreak: Total worldwide cases", 
+        xlab="Date", ylab="Novel coronavirus cases",width = 750) %>% 
+  dySeries("COVID_Day_confirmed_series", "Total cases",drawPoints = TRUE, 
+           pointSize = 3, color=rgb(53/255,116/255,199/255)) %>% 
+  dySeries("COVID_Day_deaths_series", "Total deaths",drawPoints = TRUE, 
+           pointSize = 3, color=rgb(189/255,55/255,48/255)) %>% 
+  dySeries("COVID_Day_recovered_series", "Total recovered",drawPoints = TRUE, 
+           pointSize = 3, color=rgb(69/255,136/255,51/255)) %>% 
+  dyRangeSelector()
+```
+
+# Mexico
+
+## Total cases 
+
+```{r}
+COVID_2_Day_Mexico<- COVID_2 %>% 
+  filter(Country.Region %in% c("Mexico")) %>% 
+  group_by(Date2) %>% summarise(World_confirmed=sum(Confirmed))
+
+
+COVID_Day_series_Mexico<-xts(COVID_2_Day_Mexico$World_confirmed, order.by=COVID_2_Day_Mexico$Date2)
+```
+
+Model fitting: **NO SEASONALITY**
+```{r}
+#Auto Arima for Mexico:
+
+ARIMA1_Mexico<-auto.arima(COVID_Day_series_Mexico)
+ARIMA1_Mexico<-arima(COVID_Day_series_Mexico, order = c(1,2,0))
+ARIMA1_Mexico
+
+P.AR_Mexico<-predict(ARIMA1_Mexico,n.ahead=10,prediction.interval=TRUE)
+
+Low_lim_Mexico<-P.AR_Mexico$pred-qnorm(0.975,mean=0,sd=1)*P.AR_Mexico$se
+Upp_lim_Mexico<-P.AR_Mexico$pred+qnorm(0.975,mean=0,sd=1)*P.AR_Mexico$se
+
+```
+
+```{r}
+##Data periods
+per_1 <- as.Date(as.character(COVID_2_Day_Mexico$Date2))
+per_2 <- seq(as.Date("2020-04-08",format="%Y-%m-%d"), as.Date("2020-04-17",format="%Y-%m-%d"),"1 day")
+
+
+# Merge forecast + actuals
+data <- xts(COVID_Day_series_Mexico,order.by=per_1) 
+dataNA <- rep(NA, length(data))
+A <- cbind(data,dataNA,dataNA,dataNA)
+
+
+Low_lim_Mexico <- xts(Low_lim_Mexico,order.by=per_2)
+Forecast_Mexico <- xts(P.AR_Mexico$pred,order.by=per_2)
+Upp_lim_Mexico <- xts(Upp_lim_Mexico,order.by=per_2)
+predNA <- rep(NA, length(Forecast_Mexico))
+B <- cbind(predNA, Low_lim_Mexico, Forecast_Mexico, Upp_lim_Mexico)
+
+all_series <- data.frame(rbind(as.matrix(A),as.matrix(B)))
+colnames(all_series) <- c('Actual', 'Lower_limit', 'Forecast', 'Upper_limit')
+```
+
+```{r}
+dygraph(all_series, main="SARS-COV2-outbreak: Total Mexico cases",xlab="Date", ylab="Novel coronavirus cases")%>%
+  dySeries(c('Lower_limit', 'Forecast', 'Upper_limit'),label="Forecast")%>%
+  dyRangeSelector()
+```
+
+
+## Deaths
+
+```{r}
+COVID_2_Day_Mexico_deaths<- COVID_2 %>% 
+  filter(Country.Region %in% c("Mexico")) %>% 
+  group_by(Date2) %>% summarise(World_deaths=sum(Deaths))
+
+
+COVID_Day_series_Mexico_deaths<-xts(COVID_2_Day_Mexico_deaths$World_deaths, order.by=COVID_2_Day_Mexico_deaths$Date2)
+```
+
+Model fitting: **NO SEASONALITY**
+```{r}
+#Auto Arima for Mexico:
+
+ARIMA1_Mexico<-auto.arima(COVID_Day_series_Mexico_deaths)
+#ARIMA(2,2,0)
+ARIMA1_Mexico
+
+P.AR_Mexico<-predict(ARIMA1_Mexico,n.ahead=10,prediction.interval=TRUE)
+
+Low_lim_Mexico<-P.AR_Mexico$pred-qnorm(0.975,mean=0,sd=1)*P.AR_Mexico$se
+Upp_lim_Mexico<-P.AR_Mexico$pred+qnorm(0.975,mean=0,sd=1)*P.AR_Mexico$se
+
+```
+
+```{r}
+##Data periods
+per_1 <- as.Date(as.character(COVID_2_Day_Mexico_deaths$Date2))
+per_2 <- seq(as.Date("2020-04-08",format="%Y-%m-%d"), as.Date("2020-04-17",format="%Y-%m-%d"),"1 day")
+
+
+# Merge forecast + actuals
+data <- xts(COVID_Day_series_Mexico_deaths,order.by=per_1) 
+dataNA <- rep(NA, length(data))
+A <- cbind(data,dataNA,dataNA,dataNA)
+
+
+Low_lim_Mexico <- xts(Low_lim_Mexico,order.by=per_2)
+Forecast_Mexico <- xts(P.AR_Mexico$pred,order.by=per_2)
+Upp_lim_Mexico <- xts(Upp_lim_Mexico,order.by=per_2)
+predNA <- rep(NA, length(Forecast_Mexico))
+B <- cbind(predNA, Low_lim_Mexico, Forecast_Mexico, Upp_lim_Mexico)
+
+all_series <- data.frame(rbind(as.matrix(A),as.matrix(B)))
+colnames(all_series) <- c('Actual', 'Lower_limit', 'Forecast', 'Upper_limit')
+```
+
+```{r}
+dygraph(all_series, main="SARS-COV2-outbreak: Total Mexico deaths",xlab="Date", ylab="Novel coronavirus deaths")%>%
+  dySeries(c('Lower_limit', 'Forecast', 'Upper_limit'),label="Forecast")%>%
+  dyRangeSelector()
+```
+
+# Costa Rica
+
+## Total cases
+
+```{r}
+COVID_2_Day_CostaRica<- COVID_2 %>% 
+  filter(Country.Region %in% c("Costa Rica")) %>% 
+  group_by(Date2) %>% summarise(World_confirmed=sum(Confirmed))
+
+
+COVID_Day_series_CostaRica<-xts(COVID_2_Day_CostaRica$World_confirmed, order.by=COVID_2_Day_CostaRica$Date2)
+```
+
+
+```{r}
+#Auto Arima for Costa Rica:
+
+ARIMA1_CostaRica<-auto.arima(COVID_Day_series_CostaRica)
+#ARIMA(0,2,1)
+ARIMA1_CostaRica
+
+P.AR_CRI<-predict(ARIMA1_CostaRica,n.ahead=10,prediction.interval=TRUE)
+
+Low_lim_CRI<-P.AR_CRI$pred-qnorm(0.975,mean=0,sd=1)*P.AR_CRI$se
+Upp_lim_CRI<-P.AR_CRI$pred+qnorm(0.975,mean=0,sd=1)*P.AR_CRI$se
+
+```
+
+```{r}
+##Data periods
+per_1 <- as.Date(as.character(COVID_2_Day_CostaRica$Date2))
+per_2 <- seq(as.Date("2020-04-08",format="%Y-%m-%d"), as.Date("2020-04-17",format="%Y-%m-%d"),"1 day")
+
+
+# Merge forecast + actuals
+data <- xts(COVID_Day_series_CostaRica,order.by=per_1) 
+dataNA <- rep(NA, length(data))
+A <- cbind(data,dataNA,dataNA,dataNA)
+
+
+Low_lim_CRI <- xts(Low_lim_CRI,order.by=per_2)
+Forecast_CRI <- xts(P.AR_CRI$pred,order.by=per_2)
+Upp_lim_CRI <- xts(Upp_lim_CRI,order.by=per_2)
+predNA <- rep(NA, length(Forecast_CRI))
+B <- cbind(predNA, Low_lim_CRI, Forecast_CRI, Upp_lim_CRI)
+
+all_series <- data.frame(rbind(as.matrix(A),as.matrix(B)))
+colnames(all_series) <- c('Actual', 'Lower_limit', 'Forecast', 'Upper_limit')
+```
+
+```{r}
+dygraph(all_series, main="SARS-COV2-outbreak: Total Costa Rica cases",xlab="Date", ylab="Novel coronavirus cases")%>%
+  dySeries(c('Lower_limit', 'Forecast', 'Upper_limit'),label="Forecast")%>%
+  dyRangeSelector()
+```
+
