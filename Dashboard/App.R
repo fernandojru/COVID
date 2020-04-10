@@ -15,6 +15,18 @@ COVID_2$Date2<-Date
 COVID_updated<-COVID_2 %>% filter(Date2==max(Date2))
 COVID_3<-read.csv("COVID_Covariables.csv")
 
+New_count<-function(x)
+{
+  Daily_cases<-numeric(length(x))
+  
+  for(i in length(x):2)
+  {
+    Daily_cases[i]=x[i] - x[i-1]
+  }
+  return(Daily_cases)
+}
+
+
 #=============================================UI=================================================
 header <- dashboardHeader(title = "COVID-19 Outbreak dashboard",
                           dropdownMenu(type="notifications",
@@ -39,7 +51,9 @@ body <- dashboardBody(
             fluidRow(column(width = 6,
                             box(width = NULL,leafletOutput("Map_1"))),
                      column(width = 6,
-                            box(width = NULL,dygraphOutput("dygraph_1"))))
+                            tabBox(width=NULL,
+                                   tabPanel("Total cases",dygraphOutput("dygraph_1")),
+                                   tabPanel("New cases",dygraphOutput("dygraph_3")))))
             ),
     tabItem(tabName = "country",
             fluidRow(column(width = 6,
@@ -49,7 +63,9 @@ body <- dashboardBody(
                      infoBoxOutput("Today_yesterday",width = 6)
                      ),
             fluidRow(column(width = 6,
-                            box(width = NULL,dygraphOutput("dygraph_2"))),
+                            tabBox(width = NULL,
+                                   tabPanel("Total cases",dygraphOutput("dygraph_2")),
+                                   tabPanel("New cases",dygraphOutput("dygraph_4")))),
                      column(width = 6,
                             box(width = NULL,plotOutput("Plot_1"))))
             ),
@@ -143,6 +159,47 @@ server<-shinyServer(function(session, input, output) {
       dyRangeSelector()
   })
   
+  New_cases<-reactive({
+    New_count(COVID_2_Day()$World_confirmed)
+  })
+  
+  New_deaths<-reactive({
+    New_count(COVID_2_Day()$World_deaths)
+  })
+  
+  New_recovered<-reactive({
+    New_count(COVID_2_Day()$World_recovered)
+  })
+  
+  COVID_New_confirmed_series<-reactive({
+    xts(New_cases(), order.by=COVID_2_Day()$Date2)
+  })
+  
+  COVID_New_deaths_series<-reactive({
+    xts(New_deaths(), order.by=COVID_2_Day()$Date2)
+  })
+  
+  COVID_New_recovered_series<-reactive({
+    xts(New_recovered(), order.by=COVID_2_Day()$Date2)
+  })
+  
+  New_summary<-reactive({
+    cbind(COVID_New_confirmed_series(),COVID_New_deaths_series(),COVID_New_recovered_series())
+  })
+  
+  output$dygraph_3<-renderDygraph({
+    dygraph(New_summary(), main = "SARS-COV2-outbreak: Total worldwide cases", 
+            xlab="Date", ylab="Novel coronavirus cases",width = 750) %>% 
+      dySeries("COVID_New_confirmed_series..", "New cases",drawPoints = TRUE, 
+               pointSize = 3, color=rgb(53/255,116/255,199/255)) %>% 
+      dySeries("COVID_New_deaths_series..", "New deaths",drawPoints = TRUE, 
+               pointSize = 3, color=rgb(189/255,55/255,48/255)) %>% 
+      dySeries("COVID_New_recovered_series..", "New recovered",drawPoints = TRUE, 
+               pointSize = 3, color=rgb(69/255,136/255,51/255)) %>% 
+      dyRangeSelector()
+  })
+    
+  
   #===========================Country tab=====================
   COVID_2_Day_Countries<-reactive({
     COVID_2 %>% 
@@ -155,12 +212,32 @@ server<-shinyServer(function(session, input, output) {
   })
   
   output$dygraph_2<-renderDygraph({
-    dygraph(COVID_Day_series_countries(),main="SARS-COV2-outbreak: Total cases by country",
-            xlab="Date", ylab="Total cases") %>% 
+    dygraph(COVID_Day_series_countries(),
+            main=paste("SARS-COV2-outbreak: Total cases in ",input$Select_country),
+            xlab="Date", ylab="Total Novel cases") %>% 
       dySeries("V1", input$Select_country,drawPoints = TRUE, pointSize = 3,
                color=rgb(120/255,28/255,109/255)) %>% 
       dyRangeSelector()
   })
+  
+  New_country_cases<-reactive({
+    New_count(COVID_2_Day_Countries()$World_confirmed)
+  })
+  
+  COVID_New_series_country<-reactive({
+    xts(New_country_cases(), order.by=COVID_2_Day_Countries()$Date2)
+  })
+  
+  output$dygraph_4<-renderDygraph({
+    dygraph(COVID_New_series_country(),
+            main=paste("SARS-COV2-outbreak: New cases in ",input$Select_country),
+            xlab="Date", ylab="New novel cases") %>% 
+      dySeries("V1", input$Select_country,drawPoints = TRUE, pointSize = 3,
+               color=rgb(120/255,28/255,109/255)) %>% 
+      dyRangeSelector()
+  })
+  
+  
   
   COVID_top_countries<-reactive({
     COVID_2 %>% filter(Date2==max(Date2)) %>% 
@@ -180,6 +257,7 @@ server<-shinyServer(function(session, input, output) {
       theme_minimal()
   })
   
+
   Today_confirmed<-reactive({
     COVID_2_Day_Countries()[length(COVID_2_Day_Countries()$World_confirmed),2]
     })
