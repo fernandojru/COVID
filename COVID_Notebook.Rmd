@@ -28,11 +28,13 @@ library(scales)
 library(xts)
 library(dygraphs)
 library(corrplot)
+library(lubridate)
+library(fmsb)
 ```
 
 ```{r}
 COVID<-read.csv("covid_19_data.csv")
-COVID_2<-read.csv("COVID19_9-Apr.csv")
+COVID_2<-read.csv("COVID19_10-Apr.csv")
 ```
 
 Format date:
@@ -224,8 +226,9 @@ fig <- plot_ly(COVID_updated, x = ~Confirmed, y = ~Deaths, z = ~Recovered, width
                      zaxis = list(title = 'Recovered'))) 
 fig
 ```
+## For the number of cases
 
-## Human Development Index
+### Human Development Index
 
 ```{r}
 HDI<-read.csv("Human Development Index (HDI)_2.csv",sep=";",dec=",")
@@ -302,59 +305,7 @@ corrplot(cor(COVID_numeric_1),method = "number",tl.col="black",tl.srt=15,
          col=colorRampPalette(c(rgb(204/255,197/255,126/255),rgb(237/255,105/255,37/255)))(200))
 ```
 
-## Infants lacking immunization, measles (% of one-year-olds)
-
-```{r}
-Measles<-read.csv("Measles_immunization.csv",sep=";",dec=".")
-```
-
-```{r}
-Measles$Country_2<-gsub("\\s*\\([^\\)]+\\)","",as.character(Measles$Country))
-```
-
-```{r}
-Measles$Country_2[Measles$Country_2=="United States"]<-"US"
-Measles$Country_2[Measles$Country_2=="Korea"]<-"South Korea"
-```
-
-
-```{r}
-COVID_3<- COVID_3 %>% inner_join(Measles,by=c("Country.Region"="Country_2")) %>% select(-c("Country"))
-```
-
-
-```{r}
-ggplot(COVID_3, aes(y=Measles_2018)) + 
-  geom_boxplot(fill="dodgerblue4",outlier.shape = 21, 
-               outlier.fill = "firebrick",alpha=0.75) +
-  ggtitle("Boxplot of % infants lacking measles immunization") + ylab("% of infants") +
-  theme_minimal()
-```
-
-```{r}
-ggplot(COVID_3, aes(Measles_2018)) + 
-  geom_histogram(fill="dodgerblue4",bins=20,alpha=0.8) +
-  ggtitle("Histogram of % infants lacking measles immunization") + 
-  xlab("% of infants") + 
-  ylab("Count") +
-  theme_minimal()
-```
-
-```{r}
-plot<-ggplot(data=COVID_3,aes(x=log(Cases_million),y=Measles_2018,
-                        size=Recovered_percentage,text=Country.Region)) +
-  geom_point(color="black",fill=rgb(120/255,28/255,109/255),shape=21,alpha=0.6) +
-  scale_size(range = c(3,15), name="Recovered \n percentage") +
-  theme_minimal() + 
-  theme(legend.position="bottom") +
-  labs(title="% infants lacking measles immunization Vs. logarithmus of COVID-19 cases by million inhabitants \n and proportion of recovered",
-       x="ln(Cases/1M population)",
-       y="% of infants")
-
-ggplotly(plot,tooltip = c("text"),width=750)
-```
-
-## Health expenditure (% of GDP)
+### Health expenditure (% of GDP)
 
 ```{r}
 Health_expenditure<-read.csv("Health_expenditure_GDP.csv",sep=";",dec=".")
@@ -373,8 +324,6 @@ Health_expenditure$Country_2[Health_expenditure$Country_2=="Korea"]<-"South Kore
 
 ```{r}
 COVID_3<- COVID_3 %>% inner_join(Health_expenditure,by=c("Country.Region"="Country_2")) %>% select(-c("Country"))
-
-#write.csv(COVID_3,"COVID_Covariables.csv")
 ```
 
 ```{r}
@@ -391,15 +340,312 @@ plot<-ggplot(data=COVID_3,aes(x=log(Cases_million),y=Expenditure_2016,
 ggplotly(plot,tooltip = c("text"),width=750)
 ```
 
+### Temperature
+
+```{r}
+Temperature<-read.csv("GlobalLandTemperaturesByCountry.csv",sep=";")
+```
+
+```{r}
+Date_Temp<-as.Date(Temperature$dt, format="%d/%m/%Y") 
+
+Temperature$Date_Temp<-Date_Temp
+```
+
+Extract month, filter IQ (Jan, Feb and Mar) and obtain the average IQ temperature:
+```{r}
+Temperature<- Temperature %>% mutate(Month=month(Temperature$Date_Temp,label =TRUE),
+                                     Year=year(Temperature$Date_Temp)) %>% 
+  filter(Month %in% c("Jan","Feb","Mar") & Year>=2000)  %>% 
+  group_by(Country) %>% summarise(Avg_IQ_temperature=mean(AverageTemperature))
+
+Temperature<-Temperature[!is.na(Temperature$Avg_IQ_temperature),]
+```
+
+```{r}
+Temperature$Country_2<-gsub("\\s*\\([^\\)]+\\)","",
+                                   as.character(Temperature$Country))
+```
+
+```{r}
+Temperature$Country_2[Temperature$Country_2=="United States"]<-"US"
+Temperature$Country_2[Temperature$Country_2=="Korea"]<-"South Korea"
+```
+
+```{r}
+COVID_3<- COVID_3 %>% inner_join(Temperature,by=c("Country.Region"="Country_2")) %>% select(-c("Country"))
+
+#write.csv(COVID_3,"COVID_Covariables.csv")
+```
+
+```{r}
+plot<-ggplot(data=COVID_3,aes(x=log(Cases_million),y=Avg_IQ_temperature,
+                        size=Recovered_percentage,text=Country.Region)) +
+  geom_point(color="black",fill=rgb(120/255,28/255,109/255),shape=21,alpha=0.6) +
+  scale_size(range = c(3,15), name="Recovered \n percentage") +
+  theme_minimal() + 
+  theme(legend.position="bottom") +
+  labs(title="Average IQ temperature Vs. logarithmus of COVID-19 cases by million inhabitants \n and proportion of recovered",
+       x="ln(Cases/1M population)",
+       y="Temperature (Celcius)")
+
+ggplotly(plot,tooltip = c("text"),width=750)
+```
+
+## For the number of deaths
+
+###DTP immunization
+
+```{r}
+DTP_immunization<-read.csv("Infants_lacking_immunization_DTP.csv",sep=";")
+```
+
+Remove after parentheses:
+```{r}
+DTP_immunization$Country_2<-gsub("\\s*\\([^\\)]+\\)","",
+                                 as.character(DTP_immunization$Country))
+```
+
+
+```{r}
+DTP_immunization$Country_2[DTP_immunization$Country_2=="United States"]<-"US"
+DTP_immunization$Country_2[DTP_immunization$Country_2=="Korea"]<-"South Korea"
+```
+
+
+```{r,warning=FALSE,message=FALSE}
+COVID_4<- COVID_Country %>% inner_join(DTP_immunization,
+                                       by=c("Country.Region"="Country_2")) %>% 
+  select(Country.Region,Total_confirmed,Total_deaths,Total_Recovered,
+         Lack_DTP_inmmunization_2018) %>% 
+  mutate(Recovered_percentage=(Total_Recovered/Total_confirmed)*100,
+         Death_rate=(Total_deaths/Total_confirmed)*100)
+```
+
+```{r}
+plot<-ggplot(data=COVID_4,aes(x=Death_rate,y=Lack_DTP_inmmunization_2018,
+                        size=Recovered_percentage,text=Country.Region)) +
+  geom_point(color="black",fill=rgb(120/255,28/255,109/255),shape=21,alpha=0.6) +
+  scale_size(range = c(3,15), name="Recovered \n percentage") +
+  theme_minimal() + 
+  theme(legend.position="bottom") +
+  labs(title="% infants lacking DTP immunization Vs. death rate and \n proportion of recovered",
+       x="Novel coronavirus death rate",
+       y="% of infants")
+
+ggplotly(plot,tooltip = c("text"),width=750)
+```
+
+### Infants lacking immunization, measles (% of one-year-olds)
+
+```{r}
+Measles<-read.csv("Measles_immunization.csv",sep=";",dec=".")
+```
+
+```{r}
+Measles$Country_2<-gsub("\\s*\\([^\\)]+\\)","",as.character(Measles$Country))
+```
+
+```{r}
+Measles$Country_2[Measles$Country_2=="United States"]<-"US"
+Measles$Country_2[Measles$Country_2=="Korea"]<-"South Korea"
+```
+
+
+```{r}
+COVID_4<- COVID_4 %>% inner_join(Measles,by=c("Country.Region"="Country_2")) %>% select(-c("Country"))
+```
+
+
+```{r}
+ggplot(COVID_4, aes(y=Measles_2018)) + 
+  geom_boxplot(fill="dodgerblue4",outlier.shape = 21, 
+               outlier.fill = "firebrick",alpha=0.75) +
+  ggtitle("Boxplot of % infants lacking measles immunization") + ylab("% of infants") +
+  theme_minimal()
+```
+
+```{r}
+ggplot(COVID_4, aes(Measles_2018)) + 
+  geom_histogram(fill="dodgerblue4",bins=20,alpha=0.8) +
+  ggtitle("Histogram of % infants lacking measles immunization") + 
+  xlab("% of infants") + 
+  ylab("Count") +
+  theme_minimal()
+```
+
+```{r}
+plot<-ggplot(data=COVID_4,aes(x=Death_rate,y=Measles_2018,
+                        size=Recovered_percentage,text=Country.Region)) +
+  geom_point(color="black",fill=rgb(237/255,105/255,37/255),shape=21,alpha=0.6) +
+  scale_size(range = c(3,15), name="Recovered \n percentage") +
+  theme_minimal() + 
+  theme(legend.position="bottom") +
+  labs(title="% infants lacking measles immunization Vs. fatality rate \n and proportion of recovered",
+       x="Fatality rate (%)",
+       y="% of infants")
+
+ggplotly(plot,tooltip = c("text"),width=750)
+```
+
 
 # Fitting a regression model
 
+Transforming with ln and converting temperature as kelvin:
 ```{r}
-Mod1<-lm(log(COVID_3$Cases_million)~COVID_3$Year_2018+COVID_3$Measles_2018+COVID_3$Expenditure_2016)
+Mod1<-lm(log(COVID_3$Cases_million)~log(COVID_3$Year_2018)+log(COVID_3$Measles_2018)+
+           log(COVID_3$Expenditure_2016)+log(COVID_3$Avg_IQ_temperature+273.15))
 summary(Mod1)
 ```
+
+Stepwise with AIC critertion:
 ```{r}
-hist(Mod1$residuals)
-shapiro.test(Mod1$residuals)
+Mod2<-step(Mod1,direction = "both")
 ```
+
+```{r}
+summary(Mod2)
+```
+
+Normality of residuals:
+```{r}
+hist(Mod2$residuals)
+shapiro.test(Mod2$residuals)
+```
+
+Prediction power: separate between training and testing:
+```{r}
+set.seed(179819)
+Sample <- sample(1:length(COVID_3$Cases_million),length(COVID_3$Cases_million)*0.20)
+t.testing<- COVID_3[Sample,]
+t.training<- COVID_3[-Sample,]
+```
+
+Transform the training and testing variables as before:
+```{r}
+t.training<-t.training %>% mutate(Cases_million_log=log(Cases_million),HDI_log=log(Year_2018),
+                      GDP_log=log(Expenditure_2016),
+                      Temperature_log_kelvin=log(Avg_IQ_temperature+273.15)) 
+
+t.training<-t.training[,14:17]
+
+t.testing<-t.testing %>% mutate(Cases_million_log=log(Cases_million),HDI_log=log(Year_2018),
+                      GDP_log=log(Expenditure_2016),
+                      Temperature_log_kelvin=log(Avg_IQ_temperature+273.15)) 
+
+t.testing<-t.testing[,14:17]
+```
+
+Fit the same model with training
+```{r}
+Mod3<-lm(Cases_million_log~., data=t.training)
+summary(Mod3)
+```
+
+Error functions:
+```{r}
+# Residual Sum of Square (RSS)
+RSS<-function(Pred,Actual) {
+  ss<-sum((Actual-Pred)^2)
+  return(ss)
+}
+
+# Residual Standard Error (RSE)
+RSE<-function(Pred,Real,NumPred) {
+  N<-length(Real)-NumPred-1  
+  ss<-sqrt((1/N)*RSS(Pred,Real))
+  return(ss)
+}
+# Mean Squared Error 
+MSE <- function(Pred,Actual) {
+  N<-length(Actual)
+  ss<-(1/N)*RSS(Pred,Actual)
+  return(ss)
+}
+
+# Relative error
+RelativeError<-function(Pred,Actual) {
+  ss<-sum(abs(Actual-Pred))/sum(abs(Actual))
+  return(ss)
+}
+```
+
+Prediction:
+```{r}
+Pred<-predict(Mod3,t.testing)
+```
+
+Errors:
+```{r}
+RSS_Mod3<-RSS(Pred,t.testing$Cases_million_log)
+RSE_Mod3<-RSE(Pred,t.testing$Cases_million_log,dim(t.testing)[2]-1)
+MSE_Mod3<-MSE(Pred,t.testing$Cases_million_log)
+RelativeError_Mod3<-RelativeError(Pred,t.testing$Cases_million_log)
+
+Mod3_Errors<-c(RSS_Mod3,RSE_Mod3,MSE_Mod3,RelativeError_Mod3)
+```
+
+Now, a model without temperature:
+```{r}
+t.training <- t.training %>% select(-Temperature_log_kelvin)
+t.testing <- t.testing %>% select(-Temperature_log_kelvin)
+```
+
+```{r}
+Mod4<-lm(Cases_million_log~., data=t.training)
+summary(Mod4)
+```
+
+Prediction:
+```{r}
+Pred<-predict(Mod4,t.testing)
+```
+
+Errors:
+```{r}
+RSS_Mod4<-RSS(Pred,t.testing$Cases_million_log)
+RSE_Mod4<-RSE(Pred,t.testing$Cases_million_log,dim(t.testing)[2]-1)
+MSE_Mod4<-MSE(Pred,t.testing$Cases_million_log)
+RelativeError_Mod4<-RelativeError(Pred,t.testing$Cases_million_log)
+
+Mod4_Errors<-c(RSS_Mod4,RSE_Mod4,MSE_Mod4,RelativeError_Mod4)
+```
+
+Create a radarplot:
+```{r}
+Errors<-rbind(Mod3_Errors,Mod4_Errors)
+
+rownames(Errors)<-c("Model with temperature","Model without temperature")
+
+colnames(Errors)<-c("Residual Sum of Square","Residual Standard Error","Mean Squared Error","Relative error")
+
+Errors<-as.data.frame(Errors)
+
+maximum<-apply(Errors,2,max)
+
+minimum<-apply(Errors,2,min)
+
+Errors<-rbind(minimum,Errors)
+
+Errors<-rbind(maximum,Errors)
+```
+
+```{r}
+radarchart(Errors,maxmin=TRUE,axistype=4,axislabcol="slategray4",
+           centerzero=FALSE,seg=8,cglcol="gray67",
+           pcol=c("dodgerblue2","firebrick2","darkorange2","darkorchid2"),
+           plty=1,
+           plwd=3,
+           title="Error comparison")
+
+legenda <-legend(1.5,1, legend=c("With temperature","Without temperature"),
+                 seg.len=-1.4,
+                 title="Errors",
+                 pch=21, 
+                 bty="n" ,lwd=3, y.intersp=1, horiz=FALSE,
+                 col=c("dodgerblue2","firebrick2","darkorange2","darkorchid2"))
+```
+
+
+
 
