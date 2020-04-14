@@ -949,7 +949,7 @@ mean(dd$Abs_Per_Error)*100
 
 ARIMA(2,2,4)
 ```{r}
-#Auto Arima for Costa Rica:
+#Auto Arima for Mexico:
 
 ARIMA2_Mexico<-auto.arima(COVID_series_Mexico_Train)
 summary(ARIMA2_Mexico)
@@ -1009,7 +1009,7 @@ Conclusion: Keep model with temperature
 
 Make model with the overall series
 ```{r}
-#Auto Arima for Costa Rica:
+#Auto Arima for Mexico:
 
 ARIMA_Final_Mexico<-auto.arima(COVID_Day_series_Mexico_Temp,
                              xreg = COVID_2_Day_Mexico_Temp$Temperature_Mexico)
@@ -1058,13 +1058,378 @@ dygraph(all_series_MEX, main="SARS-COV2-outbreak: Total Mexico cases",xlab="Date
 
 ```
 
+## Italy
+
+![](ItalyFlag.png){width=40%}
+
+*Model with temperature*
+
+```{r}
+Italy_Temp<-read.csv("Italy_Temperature.csv",sep=";")
+Italy_Temp$Date<-as.Date(Italy_Temp$Date,format="%d/%m/%Y")
+```
+
+```{r}
+COVID_2_Day_Italy<- COVID_2 %>% 
+  filter(Country.Region %in% c("Italy")) %>% 
+  group_by(Date2) %>% summarise(World_confirmed=sum(Confirmed))
+
+COVID_2_Day_Italy_Temp<-COVID_2_Day_Italy %>%
+  inner_join(Italy_Temp,by=c("Date2"="Date"))
+
+COVID_Day_series_Italy_Temp<-xts(COVID_2_Day_Italy_Temp$World_confirmed, order.by=COVID_2_Day_Italy_Temp$Date2)
+```
+
+```{r}
+COVID_Day_series_Italy_Train<-COVID_Day_series_Italy_Temp[1:64] #Until March 25th
+COVID_Day_series_Italy_Test<-COVID_Day_series_Italy_Temp[65:length(COVID_Day_series_Italy_Temp)] #From March 26th onwards
+```
+
+Get the lagged difference:
+```{r}
+plot(diff(COVID_Day_series_Italy_Train),type="l",main="1st ") 
+```
+
+Correlograms of first diference:
+```{r}
+tsdisplay(diff(COVID_Day_series_Italy_Train))
+```
+
+Arima model: ARIMA(1,2,0)
+```{r}
+#Auto Arima for Italy:
+
+ARIMA1_Italy<-auto.arima(COVID_Day_series_Italy_Train,
+                             xreg = COVID_2_Day_Italy_Temp$Temperature_Italy[1:64])
+#ARIMA1_Mexico<-Arima(COVID_series_Mexico_Train,order=c(2,2,3),xreg=COVID_2_Day_Mexico_Temp$Temperature_Mexico[1:74])
+summary(ARIMA1_Italy)
+```
+
+Forecast prediction to compare
+```{r}
+Test_Italy_Temp<-COVID_2_Day_Italy_Temp$Temperature_Italy[65:length(COVID_Day_series_Italy_Temp)]
 
 
+P_ITA_1<-forecast(ARIMA1_Italy,xreg = Test_Italy_Temp)
+```
+
+Calculate errors:
+```{r}
+RE_ITA_1<-RE(P_ITA_1$mean,as.vector(COVID_Day_series_Italy_Test))
+MAPE_ITA_1<-MAPE(P_ITA_1$mean,as.vector(COVID_Day_series_Italy_Test))
+MSE_ITA_1<-MSE(P_ITA_1$mean,as.vector(COVID_Day_series_Italy_Test))
+PFA_ITA_1<-PFA(P_ITA_1$mean,as.vector(COVID_Day_series_Italy_Test))
+
+Errors.ITA_1<-c(RE_ITA_1,MAPE_ITA_1,MSE_ITA_1,PFA_ITA_1)
+Errors.ITA_1
+```
+
+Manual MAPE:
+```{r}
+dd<-data.frame(Actual=as.vector(COVID_Day_series_Italy_Test),
+               Fore=P_ITA_1$mean
+)
+dd<-dd %>% mutate(Abs_Per_Error=abs(Actual-Fore)/abs(Actual))
+mean(dd$Abs_Per_Error)*100
+```
+
+*Model without temperature*
+
+ARIMA(1,2,0)
+```{r}
+#Auto Arima for Italy:
+ARIMA2_Italy<-auto.arima(COVID_Day_series_Italy_Train)
+summary(ARIMA2_Italy)
+```
+
+Forecast prediction to compare
+```{r}
+P_ITA_2<-forecast(ARIMA2_Italy,h=length(COVID_Day_series_Italy_Test))
+```
+
+Calculate errors:
+```{r}
+RE_ITA_2<-RE(P_ITA_2$mean,as.vector(COVID_Day_series_Italy_Test))
+MAPE_ITA_2<-MAPE(P_ITA_2$mean,as.vector(COVID_Day_series_Italy_Test))
+MSE_ITA_2<-MSE(P_ITA_2$mean,as.vector(COVID_Day_series_Italy_Test))
+PFA_ITA_2<-PFA(P_ITA_2$mean,as.vector(COVID_Day_series_Italy_Test))
+
+Errors.ITA_2<-c(RE_ITA_2,MAPE_ITA_2,MSE_ITA_2,PFA_ITA_2)
+Errors.ITA_2
+```
+
+```{r}
+Errors<-rbind(Errors.ITA_1,Errors.ITA_2)
+
+rownames(Errors)<-c("ARIMAX(1,2,0)","ARIMA(1,2,0)")
+
+colnames(Errors)<-c("Relative error","Mean Abs % error","Mean Squared Error","PFA")
+
+Errors<-as.data.frame(Errors)
+
+maximum<-apply(Errors,2,max)
+
+minimum<-apply(Errors,2,min)
+
+Errors<-rbind(minimum,Errors)
+
+Errors<-rbind(maximum,Errors)
+```
+
+```{r}
+radarchart(Errors,maxmin=TRUE,axistype=4,axislabcol="slategray4",
+           centerzero=FALSE,seg=8,cglcol="gray67",
+           pcol=c("dodgerblue2","firebrick2","darkorange2","darkorchid2"),
+           plty=1,
+           plwd=3,
+           title="Error comparison")
+
+legend <-legend(1.5,1, legend=c("ARIMAX(1,2,0)","ARIMA(1,2,0)"),
+                 seg.len=-1.4,
+                 title="Errors",
+                 pch=21, 
+                 bty="n" ,lwd=3, y.intersp=1, horiz=FALSE,
+                 col=c("dodgerblue2","firebrick2","darkorange2","darkorchid2"))
+```
+
+Conclusion: Keep model without temperature
+
+Make model with the overall series
+```{r}
+#Auto Arima for Italy:
+
+ARIMA_Final_Italy<-auto.arima(COVID_Day_series_Italy_Temp)
+summary(ARIMA_Final_Italy)
+```
+
+Final forecast:
+```{r}
+Future_Italy_Temp<-Italy_Temp$Temperature_Italy[Italy_Temp$Date>max(COVID_2$Date2)]
+
+P_ITA_Final<-forecast(ARIMA_Final_Italy,h=length(Future_Italy_Temp))
+Low_lim_ITA<-data.frame(P_ITA_Final$lower)[,2]
+Upp_lim_ITA<-data.frame(P_ITA_Final$upper)[,2]
+```
+
+For making the plot:
+```{r}
+##Data periods
+per_1 <- as.Date(as.character(COVID_2_Day_Italy_Temp$Date2))
+per_2 <- seq(as.Date(max(COVID_2_Day_Italy_Temp$Date2)+1,format="%Y-%m-%d"), as.Date("2020-04-30",format="%Y-%m-%d"),"1 day")
 
 
+# Merge forecast + actuals
+data <- xts(COVID_Day_series_Italy_Temp,order.by=per_1) 
+dataNA <- rep(NA, length(data))
+A <- cbind(data,dataNA,dataNA,dataNA)
 
 
+Low_lim_ITA <- xts(Low_lim_ITA,order.by=per_2)
+Forecast_ITA <- xts(P_ITA_Final$mean,order.by=per_2)
+Upp_lim_ITA <- xts(Upp_lim_ITA,order.by=per_2)
+predNA <- rep(NA, length(Forecast_ITA))
+B <- cbind(predNA, Low_lim_ITA, Forecast_ITA, Upp_lim_ITA)
 
+all_series_ITA <- data.frame(rbind(as.matrix(A),as.matrix(B)))
+colnames(all_series_ITA) <- c('Actual', 'Lower_limit', 'Forecast', 'Upper_limit')
+```
+
+```{r}
+dygraph(all_series_ITA, main="SARS-COV2-outbreak: Total Italy cases",xlab="Date", ylab="Novel coronavirus cases",width = 750)%>%
+  dySeries(c('Lower_limit', 'Forecast', 'Upper_limit'),label="Forecast",strokeWidth=2,
+           drawPoints = TRUE, pointSize = 2, color=rgb(190/255,59/255,61/255)) %>%
+  dySeries("Actual",drawPoints = TRUE, strokeWidth=2, pointSize = 2,
+           color=rgb(64/255,143/255,78/255)) %>% 
+  dyRangeSelector()
+
+```
+
+
+## Lebanon
+
+![](LebanonFlag.png){width=40%}
+
+*Model with temperature*
+
+```{r}
+Lebanon_Temp<-read.csv("Lebanon_Temperature.csv",sep=";")
+Lebanon_Temp$Date<-as.Date(Lebanon_Temp$Date,format="%d/%m/%Y")
+```
+
+```{r}
+COVID_2_Day_Lebanon<- COVID_2 %>% 
+  filter(Country.Region %in% c("Lebanon")) %>% 
+  group_by(Date2) %>% summarise(World_confirmed=sum(Confirmed))
+
+COVID_2_Day_Lebanon_Temp<-COVID_2_Day_Lebanon %>%
+  inner_join(Lebanon_Temp,by=c("Date2"="Date"))
+
+COVID_Day_series_Lebanon_Temp<-xts(COVID_2_Day_Lebanon_Temp$World_confirmed, order.by=COVID_2_Day_Lebanon_Temp$Date2)
+```
+
+```{r}
+COVID_series_Lebanon_Train<-COVID_Day_series_Lebanon_Temp[1:74] #Until April 4th
+COVID_series_Lebanon_Test<-COVID_Day_series_Lebanon_Temp[75:length(COVID_Day_series_Lebanon_Temp)] #From April 4th onwards
+```
+
+Get the lagged difference:
+```{r}
+plot(diff(COVID_series_Lebanon_Train),type="l",main="1st ") 
+```
+
+Correlograms of first diference:
+```{r}
+tsdisplay(diff(COVID_series_Lebanon_Train))
+```
+
+Arima model: ARIMA(1,1,2)
+```{r}
+#Auto Arima for Lebanon:
+
+ARIMA1_Lebanon<-auto.arima(COVID_series_Lebanon_Train,
+                             xreg = COVID_2_Day_Lebanon_Temp$Temperature_Lebanon[1:74])
+#ARIMA1_Mexico<-Arima(COVID_series_Mexico_Train,order=c(2,2,3),xreg=COVID_2_Day_Mexico_Temp$Temperature_Mexico[1:74])
+summary(ARIMA1_Lebanon)
+```
+
+Forecast prediction to compare
+```{r}
+Test_Lebanon_Temp<-COVID_2_Day_Lebanon_Temp$Temperature_Lebanon[75:length(COVID_Day_series_Lebanon_Temp)]
+
+
+P_LBN_1<-forecast(ARIMA1_Lebanon,xreg = Test_Lebanon_Temp)
+```
+
+Calculate errors:
+```{r}
+RE_LBN_1<-RE(P_LBN_1$mean,as.vector(COVID_series_Lebanon_Test))
+MAPE_LBN_1<-MAPE(P_LBN_1$mean,as.vector(COVID_series_Lebanon_Test))
+MSE_LBN_1<-MSE(P_LBN_1$mean,as.vector(COVID_series_Lebanon_Test))
+PFA_LBN_1<-PFA(P_LBN_1$mean,as.vector(COVID_series_Lebanon_Test))
+
+Errors.LBN_1<-c(RE_LBN_1,MAPE_LBN_1,MSE_LBN_1,PFA_LBN_1)
+Errors.LBN_1
+```
+
+Manual MAPE:
+```{r}
+dd<-data.frame(Actual=as.vector(COVID_series_Lebanon_Test),
+               Fore=P_LBN_1$mean
+)
+dd<-dd %>% mutate(Abs_Per_Error=abs(Actual-Fore)/abs(Actual))
+mean(dd$Abs_Per_Error)*100
+```
+
+*Model without temperature*
+
+ARIMA(0,2,2)
+```{r}
+#Auto Arima for Lebanon:
+ARIMA2_Lebanon<-auto.arima(COVID_series_Lebanon_Train)
+summary(ARIMA2_Lebanon)
+```
+
+Forecast prediction to compare
+```{r}
+P_LBN_2<-forecast(ARIMA2_Lebanon,h=length(COVID_series_Lebanon_Test))
+```
+
+Calculate errors:
+```{r}
+RE_LBN_2<-RE(P_LBN_2$mean,as.vector(COVID_series_Lebanon_Test))
+MAPE_LBN_2<-MAPE(P_LBN_2$mean,as.vector(COVID_series_Lebanon_Test))
+MSE_LBN_2<-MSE(P_LBN_2$mean,as.vector(COVID_series_Lebanon_Test))
+PFA_LBN_2<-PFA(P_LBN_2$mean,as.vector(COVID_series_Lebanon_Test))
+
+Errors.LBN_2<-c(RE_LBN_2,MAPE_LBN_2,MSE_LBN_2,PFA_LBN_2)
+Errors.LBN_2
+```
+
+```{r}
+Errors<-rbind(Errors.LBN_1,Errors.LBN_2)
+
+rownames(Errors)<-c("ARIMAX(1,1,2)","ARIMA(0,2,2)")
+
+colnames(Errors)<-c("Relative error","Mean Abs % error","Mean Squared Error","PFA")
+
+Errors<-as.data.frame(Errors)
+
+maximum<-apply(Errors,2,max)
+
+minimum<-apply(Errors,2,min)
+
+Errors<-rbind(minimum,Errors)
+
+Errors<-rbind(maximum,Errors)
+```
+
+```{r}
+radarchart(Errors,maxmin=TRUE,axistype=4,axislabcol="slategray4",
+           centerzero=FALSE,seg=8,cglcol="gray67",
+           pcol=c("dodgerblue2","firebrick2","darkorange2","darkorchid2"),
+           plty=1,
+           plwd=3,
+           title="Error comparison")
+
+legend <-legend(1.5,1, legend=c("ARIMAX(1,1,2)","ARIMA(0,2,2)"),
+                 seg.len=-1.4,
+                 title="Errors",
+                 pch=21, 
+                 bty="n" ,lwd=3, y.intersp=1, horiz=FALSE,
+                 col=c("dodgerblue2","firebrick2","darkorange2","darkorchid2"))
+```
+
+Conclusion: Keep model without temperature
+
+Make model with the overall series
+```{r}
+#Auto Arima for Lebanon:
+
+ARIMA_Final_Lebanon<-auto.arima(COVID_Day_series_Lebanon_Temp)
+summary(ARIMA_Final_Lebanon)
+```
+
+Final forecast:
+```{r}
+Future_Lebanon_Temp<-Lebanon_Temp$Temperature_Lebanon[Lebanon_Temp$Date>max(COVID_2$Date2)]
+
+P_LBN_Final<-forecast(ARIMA_Final_Lebanon,h=length(Future_Lebanon_Temp))
+Low_lim_LBN<-data.frame(P_LBN_Final$lower)[,2]
+Upp_lim_LBN<-data.frame(P_LBN_Final$upper)[,2]
+```
+
+For making the plot:
+```{r}
+##Data periods
+per_1 <- as.Date(as.character(COVID_2_Day_Lebanon_Temp$Date2))
+per_2 <- seq(as.Date(max(COVID_2_Day_Lebanon_Temp$Date2)+1,format="%Y-%m-%d"), as.Date("2020-04-30",format="%Y-%m-%d"),"1 day")
+
+
+# Merge forecast + actuals
+data <- xts(COVID_Day_series_Lebanon_Temp,order.by=per_1) 
+dataNA <- rep(NA, length(data))
+A <- cbind(data,dataNA,dataNA,dataNA)
+
+
+Low_lim_LBN <- xts(Low_lim_LBN,order.by=per_2)
+Forecast_LBN <- xts(P_LBN_Final$mean,order.by=per_2)
+Upp_lim_LBN <- xts(Upp_lim_LBN,order.by=per_2)
+predNA <- rep(NA, length(Forecast_ITA))
+B <- cbind(predNA, Low_lim_LBN, Forecast_LBN, Upp_lim_LBN)
+
+all_series_LBN <- data.frame(rbind(as.matrix(A),as.matrix(B)))
+colnames(all_series_LBN) <- c('Actual', 'Lower_limit', 'Forecast', 'Upper_limit')
+```
+
+```{r}
+dygraph(all_series_LBN, main="SARS-COV2-outbreak: Total Lebanon cases",xlab="Date", ylab="Novel coronavirus cases",width = 750)%>%
+  dySeries(c('Lower_limit', 'Forecast', 'Upper_limit'),label="Forecast",strokeWidth=2,
+           drawPoints = TRUE, pointSize = 2, color=rgb(218/255,55/255,50/255)) %>%
+  dySeries("Actual",drawPoints = TRUE, strokeWidth=2, pointSize = 2,
+           color=rgb(73/255,163/255,90/255)) %>% 
+  dyRangeSelector()
+
+```
 
 
 
