@@ -35,7 +35,7 @@ library(forecast)
 
 ```{r}
 COVID<-read.csv("covid_19_data.csv")
-COVID_2<-read.csv("COVID19_12-Apr.csv")
+COVID_2<-read.csv("COVID19_13-Apr.csv")
 ```
 
 Format date:
@@ -1431,5 +1431,20 @@ dygraph(all_series_LBN, main="SARS-COV2-outbreak: Total Lebanon cases",xlab="Dat
 
 ```
 
+
+
+
+
+
+
+
+
+```{r}
+#Forecasts<-list(all_series_CRI,all_series_MEX,all_series_ITA,all_series_LBN)
+#names(Forecasts)<-c("Costa Rica","Mexico","Italy","Lebanon")
+#Forecasts$Mexico
+
+#save(Forecasts, file="Forecasts.RData")
+```
 
 
