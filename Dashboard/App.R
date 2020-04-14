@@ -26,12 +26,15 @@ New_count<-function(x)
   return(Daily_cases)
 }
 
+load("Forecasts.RData")
 
 #=============================================UI=================================================
 header <- dashboardHeader(title = "COVID-19 Outbreak dashboard",
                           dropdownMenu(type="notifications",
                                        notificationItem(text=paste("Last update", max(COVID_2$Date2)), status="info"),
-                                       badgeStatus="info")
+                                       notificationItem(text=paste("Forecast until ",max(rownames(Forecasts$Italy)),
+                                                                   " available for Costa Rica, Mexico, Italy & Lebanon"), status="info"),
+                                       badgeStatus="primary")
                           )
 
 sidebar <- dashboardSidebar(
@@ -212,12 +215,48 @@ server<-shinyServer(function(session, input, output) {
   })
   
   output$dygraph_2<-renderDygraph({
-    dygraph(COVID_Day_series_countries(),
-            main=paste("SARS-COV2-outbreak: Total cases in ",input$Select_country),
-            xlab="Date", ylab="Total Novel cases") %>% 
-      dySeries("V1", input$Select_country,drawPoints = TRUE, pointSize = 3,
-               color=rgb(120/255,28/255,109/255)) %>% 
-      dyRangeSelector()
+    if(input$Select_country=="Costa Rica")
+    {
+      dygraph(Forecasts$`Costa Rica`, main="SARS-COV2-outbreak: Total Costa Rica cases",xlab="Date", ylab="Novel coronavirus cases",width = 750)%>%
+        dySeries(c('Lower_limit', 'Forecast', 'Upper_limit'),label="Forecast",strokeWidth=2,
+                 drawPoints = TRUE, pointSize = 2, color=rgb(189/255,44/255,47/255)) %>%
+        dySeries("Actual",drawPoints = TRUE, strokeWidth=2, pointSize = 2,
+                 color=rgb(10/255,44/255,119/255)) %>% 
+        dyRangeSelector()
+    } else if(input$Select_country=="Mexico")
+    {
+      dygraph(Forecasts$Mexico, main="SARS-COV2-outbreak: Total Mexico cases",xlab="Date", ylab="Novel coronavirus cases",width = 750)%>%
+        dySeries(c('Lower_limit', 'Forecast', 'Upper_limit'),label="Forecast",strokeWidth=2,
+                 drawPoints = TRUE, pointSize = 2, color=rgb(189/255,44/255,47/255)) %>%
+        dySeries("Actual",drawPoints = TRUE, strokeWidth=2, pointSize = 2,
+                 color=rgb(43/255,102/255,73/255)) %>% 
+        dyRangeSelector()
+    } else if(input$Select_country=="Italy")
+    {
+      dygraph(Forecasts$Italy, main="SARS-COV2-outbreak: Total Italy cases",xlab="Date", ylab="Novel coronavirus cases",width = 750)%>%
+        dySeries(c('Lower_limit', 'Forecast', 'Upper_limit'),label="Forecast",strokeWidth=2,
+                 drawPoints = TRUE, pointSize = 2, color=rgb(190/255,59/255,61/255)) %>%
+        dySeries("Actual",drawPoints = TRUE, strokeWidth=2, pointSize = 2,
+                 color=rgb(64/255,143/255,78/255)) %>% 
+        dyRangeSelector()
+      
+    } else if(input$Select_country=="Lebanon")
+    {
+      dygraph(Forecasts$Lebanon, main="SARS-COV2-outbreak: Total Lebanon cases",xlab="Date", ylab="Novel coronavirus cases",width = 750)%>%
+        dySeries(c('Lower_limit', 'Forecast', 'Upper_limit'),label="Forecast",strokeWidth=2,
+                 drawPoints = TRUE, pointSize = 2, color=rgb(218/255,55/255,50/255)) %>%
+        dySeries("Actual",drawPoints = TRUE, strokeWidth=2, pointSize = 2,
+                 color=rgb(73/255,163/255,90/255)) %>% 
+        dyRangeSelector()
+    } else
+    {
+      dygraph(COVID_Day_series_countries(),
+              main=paste("SARS-COV2-outbreak: Total cases in ",input$Select_country),
+              xlab="Date", ylab="Novel coronavirus cases") %>% 
+        dySeries("V1", input$Select_country,drawPoints = TRUE, pointSize = 3,
+                 color=rgb(120/255,28/255,109/255)) %>% 
+        dyRangeSelector()
+    }
   })
   
   New_country_cases<-reactive({
