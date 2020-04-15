@@ -41,7 +41,8 @@ sidebar <- dashboardSidebar(
   sidebarMenu(
     menuItem(tagList(icon("procedures"), "Overview"),tabName = "overview"),
     menuItem(tagList(icon("procedures"),"Countries"),tabName = "country"),
-    menuItem(tagList(icon("procedures"),"Statistics"),tabName = "statistics")
+    menuItem(tagList(icon("procedures"),"Statistics"),tabName = "statistics"),
+    menuItem(tagList(icon("file-download"),"Data downloads"),tabName = "downloads")
             )
       )
 
@@ -79,7 +80,18 @@ body <- dashboardBody(
                             tabBox(width = NULL,
                                    tabPanel("HDI",plotlyOutput("Plot_3")),
                                    tabPanel("Health expenditure",plotlyOutput("Plot_4")),
-                                   tabPanel("Measles",plotlyOutput("Plot_5"))))))
+                                   tabPanel("Measles",plotlyOutput("Plot_5")))))),
+    tabItem(tabName = "downloads",
+            fluidRow(column(width = 6,
+                            box(width = NULL,selectInput("Select_country_download","Select a country",
+                                                         choices=unique(COVID_2$Country.Region),
+                                                         multiple = FALSE,selected = "Italy"))),
+                     column(width = 4,
+                            box(width = NULL,downloadButton("Download_data","Download data")))),
+            fluidRow(column(width = 6,
+                            box(width = NULL,tableOutput("Table_1")))
+                     )
+            )
     
   )
 )
@@ -248,6 +260,23 @@ server<-shinyServer(function(session, input, output) {
         dySeries("Actual",drawPoints = TRUE, strokeWidth=2, pointSize = 2,
                  color=rgb(73/255,163/255,90/255)) %>% 
         dyRangeSelector()
+    } else if(input$Select_country=="Colombia")
+    {
+      dygraph(Forecasts$Colombia, main="SARS-COV2-outbreak: Total Colombia cases",xlab="Date", ylab="Novel coronavirus cases",width = 750)%>%
+        dySeries(c('Lower_limit', 'Forecast', 'Upper_limit'),label="Forecast",strokeWidth=2,
+                 drawPoints = TRUE, pointSize = 2, color=rgb(17/255,57/255,141/255)) %>%
+        dySeries("Actual",drawPoints = TRUE, strokeWidth=2, pointSize = 2,
+                 color=rgb(246/255,209/255,75/255)) %>% 
+        dyRangeSelector()
+    } else if(input$Select_country=="Chile")
+    {
+      dygraph(Forecasts$Chile, main="SARS-COV2-outbreak: Total Chile cases",xlab="Date", ylab="Novel coronavirus cases",width = 750)%>%
+        dySeries(c('Lower_limit', 'Forecast', 'Upper_limit'),label="Forecast",strokeWidth=2,
+                 drawPoints = TRUE, pointSize = 2, color=rgb(196/255,60/255,44/255)) %>%
+        dySeries("Actual",drawPoints = TRUE, strokeWidth=2, pointSize = 2,
+                 color=rgb(16/255,59/255,160/255)) %>% 
+        dyRangeSelector()
+      
     } else
     {
       dygraph(COVID_Day_series_countries(),
@@ -346,11 +375,6 @@ server<-shinyServer(function(session, input, output) {
   })
   
   
-  
-  
-  
-  
-  
   #===========================Statistics tab=====================
   
   output$Plot_2<-renderPlotly({
@@ -411,8 +435,53 @@ server<-shinyServer(function(session, input, output) {
     ggplotly(Measles_Plot(),tooltip = c("text"))
   })
   
+  #=================================Downloads=========================
   
+  COVID_2_Day_Countries_Download<-reactive({
+    COVID_2 %>% 
+      filter(Country.Region %in% input$Select_country_download) %>% 
+      group_by(Date2) %>% summarise(World_confirmed=sum(Confirmed)) %>% 
+      mutate(Date2=as.character(Date2))
+  })
   
+  COVID_To_Download<-reactive({
+    if(input$Select_country_download=="Costa Rica")
+    {
+      Forecasts$`Costa Rica`
+    } else if(input$Select_country_download=="Mexico")
+    {
+      Forecasts$Mexico
+    } else if(input$Select_country_download=="Italy")
+    {
+      Forecasts$Italy
+    } else if(input$Select_country_download=="Lebanon")
+    {
+      Forecasts$Lebanon
+    } else if(input$Select_country_download=="Colombia")
+    {
+      Forecasts$Colombia
+    } else if(input$Select_country_download=="Chile")
+    {
+      Forecasts$Chile
+    } else
+    {
+      COVID_2_Day_Countries_Download()
+    }
+  })
+  
+  output$Table_1<-renderTable({
+    COVID_To_Download()
+  },rownames = TRUE)
+  
+  output$Download_data<-downloadHandler(
+    filename = function() {
+      paste(input$Select_country_download,"_Data_Forecast.csv")
+    },
+    content = function(file)
+    {
+      write.csv(COVID_To_Download(),file,row.names = TRUE)
+    }
+  )
   
   
   
