@@ -1,6 +1,6 @@
 ---
 title: "COVID-19 Outbreak: Worldwide analysis"
-author: "Aoun, Camargo, Martinez,Rodriguez"
+author: "Aoun, Camargo, Martinez, Rodriguez"
 output: 
   html_notebook:
     toc: true
@@ -280,6 +280,27 @@ COVID_3<- COVID_Country %>% inner_join(HDI,by=c("Country.Region"="Country_2")) %
 COVID_3<-COVID_3[!is.na(COVID_3$Population_2018),]
 
 ```
+
+Countries with top 10 cases per million inhabitants
+```{r}
+COVID3_top<-COVID_3 %>% top_n(10,Cases_million) %>% arrange(desc(Cases_million)) %>% 
+  mutate(Cases_million=round(Cases_million,0))
+```
+
+```{r}
+plot<-ggplot(data=COVID3_top
+       , aes(x=Cases_million,y=reorder(Country.Region,Cases_million))) +
+  geom_bar(stat ="identity",alpha=0.8,fill="sky blue", ) +
+  geom_text(aes(label=Cases_million), vjust=0.5, hjust=0.9,color="black", size=3.5) +
+  scale_x_continuous(labels = comma) +
+  labs(title = paste("Top 10 countries with confirmed cases per million habitant \n as of ",max(COVID_2$Date2)),
+       x = "Confirmed cases per million habitants",
+       y = "Country") +
+  theme_minimal()
+
+ggplotly(plot,tooltip = c("x"),width=750)
+```
+
 
 Plot the Human Development Index(HDI) Vs. the number of cases (applying a log transformation), and the proportion of recovered cases:
 ```{r}
@@ -1431,17 +1452,384 @@ dygraph(all_series_LBN, main="SARS-COV2-outbreak: Total Lebanon cases",xlab="Dat
 
 ```
 
+## Colombia
+
+![](ColombiaFlag.png){width=40%}
+
+*Model with temperature*
+
+```{r}
+Colombia_Temp<-read.csv("Colombia_Temperature.csv",sep=";")
+Colombia_Temp$Date<-as.Date(Colombia_Temp$Date,format="%d/%m/%Y")
+```
+
+```{r}
+COVID_2_Day_Colombia<- COVID_2 %>% 
+  filter(Country.Region %in% c("Colombia")) %>% 
+  group_by(Date2) %>% summarise(World_confirmed=sum(Confirmed))
+
+COVID_2_Day_Colombia_Temp<-COVID_2_Day_Colombia %>%
+  inner_join(Colombia_Temp,by=c("Date2"="Date"))
+
+COVID_Day_series_Colombia_Temp<-xts(COVID_2_Day_Colombia_Temp$World_confirmed, order.by=COVID_2_Day_Colombia_Temp$Date2)
+```
+
+```{r}
+COVID_series_Colombia_Train<-COVID_Day_series_Colombia_Temp[1:74] #Until April 4th
+COVID_series_Colombia_Test<-COVID_Day_series_Colombia_Temp[75:length(COVID_Day_series_Colombia_Temp)] #From April 5th onwards
+```
+
+Get the lagged difference:
+```{r}
+plot(diff(COVID_series_Colombia_Train),type="l",main="1st ") 
+```
+
+Correlograms of first diference:
+```{r}
+tsdisplay(diff(COVID_series_Colombia_Train))
+```
+
+Arima model: ARIMA(2,2,2)
+```{r}
+#Auto Arima for Colombia:
+
+ARIMA1_Colombia<-auto.arima(COVID_series_Colombia_Train,
+                             xreg = COVID_2_Day_Colombia_Temp$Temperature_Colombia[1:74])
+#ARIMA1_Mexico<-Arima(COVID_series_Mexico_Train,order=c(2,2,3),xreg=COVID_2_Day_Mexico_Temp$Temperature_Mexico[1:74])
+summary(ARIMA1_Colombia)
+```
+
+Forecast prediction to compare
+```{r}
+Test_Colombia_Temp<-COVID_2_Day_Colombia_Temp$Temperature_Colombia[75:length(COVID_Day_series_Colombia_Temp)]
 
 
+P_COL_1<-forecast(ARIMA1_Colombia,xreg = Test_Colombia_Temp)
+```
+
+Calculate errors:
+```{r}
+RE_COL_1<-RE(P_COL_1$mean,as.vector(COVID_series_Colombia_Test))
+MAPE_COL_1<-MAPE(P_COL_1$mean,as.vector(COVID_series_Colombia_Test))
+MSE_COL_1<-MSE(P_COL_1$mean,as.vector(COVID_series_Colombia_Test))
+PFA_COL_1<-PFA(P_COL_1$mean,as.vector(COVID_series_Colombia_Test))
+
+Errors.COL_1<-c(RE_COL_1,MAPE_COL_1,PFA_COL_1,MSE_COL_1)
+Errors.COL_1
+```
+
+Manual MAPE:
+```{r}
+dd<-data.frame(Actual=as.vector(COVID_series_Colombia_Test),
+               Fore=P_COL_1$mean
+)
+dd<-dd %>% mutate(Abs_Per_Error=abs(Actual-Fore)/abs(Actual))
+mean(dd$Abs_Per_Error)*100
+```
+
+*Model without temperature*
+
+ARIMA(2,2,2)
+```{r}
+#Auto Arima for Colombia:
+ARIMA2_Colombia<-auto.arima(COVID_series_Colombia_Train)
+summary(ARIMA2_Colombia)
+```
+
+Forecast prediction to compare
+```{r}
+P_COL_2<-forecast(ARIMA2_Colombia,h=length(COVID_series_Colombia_Test))
+```
+
+Calculate errors:
+```{r}
+RE_COL_2<-RE(P_COL_2$mean,as.vector(COVID_series_Colombia_Test))
+MAPE_COL_2<-MAPE(P_COL_2$mean,as.vector(COVID_series_Colombia_Test))
+MSE_COL_2<-MSE(P_COL_2$mean,as.vector(COVID_series_Colombia_Test))
+PFA_COL_2<-PFA(P_COL_2$mean,as.vector(COVID_series_Colombia_Test))
+
+Errors.COL_2<-c(RE_COL_2,MAPE_COL_2,MSE_COL_2,PFA_COL_2)
+Errors.COL_2
+```
+
+```{r}
+Errors<-rbind(Errors.COL_1,Errors.COL_2)
+
+rownames(Errors)<-c("ARIMAX(2,2,2)","ARIMA(2,2,2)")
+
+colnames(Errors)<-c("Relative error","Mean Abs % error","Mean Squared Error","PFA")
+
+Errors<-as.data.frame(Errors)
+
+maximum<-apply(Errors,2,max)
+
+minimum<-apply(Errors,2,min)
+
+Errors<-rbind(minimum,Errors)
+
+Errors<-rbind(maximum,Errors)
+```
+
+```{r}
+radarchart(Errors,maxmin=TRUE,axistype=4,axislabcol="slategray4",
+           centerzero=FALSE,seg=8,cglcol="gray67",
+           pcol=c("dodgerblue2","firebrick2","darkorange2","darkorchid2"),
+           plty=1,
+           plwd=3,
+           title="Error comparison")
+
+legend <-legend(1.5,1, legend=c("ARIMAX(2,2,2)","ARIMA(2,2,2)"),
+                 seg.len=-1.4,
+                 title="Errors",
+                 pch=21, 
+                 bty="n" ,lwd=3, y.intersp=1, horiz=FALSE,
+                 col=c("dodgerblue2","firebrick2","darkorange2","darkorchid2"))
+```
+
+Conclusion: Keep model without temperature
+
+Make model with the overall series
+```{r}
+#Auto Arima for Colombia:
+
+ARIMA_Final_Colombia<-auto.arima(COVID_Day_series_Colombia_Temp)
+summary(ARIMA_Final_Colombia)
+```
+
+Final forecast:
+```{r}
+Future_Colombia_Temp<-Colombia_Temp$Temperature_Colombia[Colombia_Temp$Date>max(COVID_2$Date2)]
+
+P_COL_Final<-forecast(ARIMA_Final_Colombia,h=length(Future_Colombia_Temp))
+Low_lim_COL<-data.frame(P_COL_Final$lower)[,2]
+Upp_lim_COL<-data.frame(P_COL_Final$upper)[,2]
+```
+
+For making the plot:
+```{r}
+##Data periods
+per_1 <- as.Date(as.character(COVID_2_Day_Colombia_Temp$Date2))
+per_2 <- seq(as.Date(max(COVID_2_Day_Colombia_Temp$Date2)+1,format="%Y-%m-%d"), as.Date("2020-04-30",format="%Y-%m-%d"),"1 day")
 
 
+# Merge forecast + actuals
+data <- xts(COVID_Day_series_Colombia_Temp,order.by=per_1) 
+dataNA <- rep(NA, length(data))
+A <- cbind(data,dataNA,dataNA,dataNA)
 
+
+Low_lim_COL <- xts(Low_lim_COL,order.by=per_2)
+Forecast_COL <- xts(P_COL_Final$mean,order.by=per_2)
+Upp_lim_COL <- xts(Upp_lim_COL,order.by=per_2)
+predNA <- rep(NA, length(Forecast_COL))
+B <- cbind(predNA, Low_lim_COL, Forecast_COL, Upp_lim_COL)
+
+all_series_COL <- data.frame(rbind(as.matrix(A),as.matrix(B)))
+colnames(all_series_COL) <- c('Actual', 'Lower_limit', 'Forecast', 'Upper_limit')
+```
+
+```{r}
+dygraph(all_series_COL, main="SARS-COV2-outbreak: Total Colombia cases",xlab="Date", ylab="Novel coronavirus cases",width = 750)%>%
+  dySeries(c('Lower_limit', 'Forecast', 'Upper_limit'),label="Forecast",strokeWidth=2,
+           drawPoints = TRUE, pointSize = 2, color=rgb(17/255,57/255,141/255)) %>%
+  dySeries("Actual",drawPoints = TRUE, strokeWidth=2, pointSize = 2,
+           color=rgb(246/255,209/255,75/255)) %>% 
+  dyRangeSelector()
+
+```
+
+## Chile
+
+![](ChileFlag.png){width=40%}
+
+*Model with temperature*
+
+```{r}
+Chile_Temp<-read.csv("Chile_Temperature.csv",sep=";")
+Chile_Temp$Date<-as.Date(Chile_Temp$Date,format="%d/%m/%Y")
+```
+
+```{r}
+COVID_2_Day_Chile<- COVID_2 %>% 
+  filter(Country.Region %in% c("Chile")) %>% 
+  group_by(Date2) %>% summarise(World_confirmed=sum(Confirmed))
+
+COVID_2_Day_Chile_Temp<-COVID_2_Day_Chile %>%
+  inner_join(Chile_Temp,by=c("Date2"="Date"))
+
+COVID_Day_series_Chile_Temp<-xts(COVID_2_Day_Chile_Temp$World_confirmed, order.by=COVID_2_Day_Chile_Temp$Date2)
+```
+
+```{r}
+COVID_series_Chile_Train<-COVID_Day_series_Chile_Temp[1:76] #Until April 6th
+COVID_series_Chile_Test<-COVID_Day_series_Chile_Temp[77:length(COVID_Day_series_Chile_Temp)] #From April 7th onwards
+```
+
+Get the lagged difference:
+```{r}
+plot(diff(COVID_series_Chile_Train),type="l",main="1st ") 
+```
+
+Correlograms of first diference:
+```{r}
+tsdisplay(diff(COVID_series_Chile_Train))
+```
+
+Arima model: ARIMA(1,1,0)
+```{r}
+#Auto Arima for Chile:
+
+ARIMA1_Chile<-auto.arima(COVID_series_Chile_Train,
+                             xreg = COVID_2_Day_Chile_Temp$Temperature_Chile[1:76])
+#ARIMA1_Mexico<-Arima(COVID_series_Mexico_Train,order=c(2,2,3),xreg=COVID_2_Day_Mexico_Temp$Temperature_Mexico[1:74])
+summary(ARIMA1_Chile)
+```
+
+Forecast prediction to compare
+```{r}
+Test_Chile_Temp<-COVID_2_Day_Chile_Temp$Temperature_Chile[77:length(COVID_Day_series_Chile_Temp)]
+
+
+P_CHL_1<-forecast(ARIMA1_Chile,xreg = Test_Chile_Temp)
+```
+
+Calculate errors:
+```{r}
+RE_CHL_1<-RE(P_CHL_1$mean,as.vector(COVID_series_Chile_Test))
+MAPE_CHL_1<-MAPE(P_CHL_1$mean,as.vector(COVID_series_Chile_Test))
+MSE_CHL_1<-MSE(P_CHL_1$mean,as.vector(COVID_series_Chile_Test))
+PFA_CHL_1<-PFA(P_CHL_1$mean,as.vector(COVID_series_Chile_Test))
+
+Errors.CHL_1<-c(RE_CHL_1,MAPE_CHL_1,MSE_CHL_1,PFA_CHL_1)
+Errors.CHL_1
+```
+
+Manual MAPE:
+```{r}
+dd<-data.frame(Actual=as.vector(COVID_series_Chile_Test),
+               Fore=P_CHL_1$mean
+)
+dd<-dd %>% mutate(Abs_Per_Error=abs(Actual-Fore)/abs(Actual))
+mean(dd$Abs_Per_Error)*100
+```
+
+*Model without temperature*
+
+ARIMA(1,2,4)
+```{r}
+#Auto Arima for Colombia:
+ARIMA2_Chile<-auto.arima(COVID_series_Chile_Train)
+summary(ARIMA2_Chile)
+```
+
+Forecast prediction to compare
+```{r}
+P_CHL_2<-forecast(ARIMA2_Chile,h=length(COVID_series_Chile_Test))
+```
+
+Calculate errors:
+```{r}
+RE_CHL_2<-RE(P_CHL_2$mean,as.vector(COVID_series_Chile_Test))
+MAPE_CHL_2<-MAPE(P_CHL_2$mean,as.vector(COVID_series_Chile_Test))
+MSE_CHL_2<-MSE(P_CHL_2$mean,as.vector(COVID_series_Chile_Test))
+PFA_CHL_2<-PFA(P_CHL_2$mean,as.vector(COVID_series_Chile_Test))
+
+Errors.CHL_2<-c(RE_CHL_2,MAPE_CHL_2,MSE_CHL_2,PFA_CHL_2)
+Errors.CHL_2
+```
+
+```{r}
+Errors<-rbind(Errors.CHL_1,Errors.CHL_2)
+
+rownames(Errors)<-c("ARIMAX(1,1,0)","ARIMA(1,2,4)")
+
+colnames(Errors)<-c("Relative error","Mean Abs % error","Mean Squared Error","PFA")
+
+Errors<-as.data.frame(Errors)
+
+maximum<-apply(Errors,2,max)
+
+minimum<-apply(Errors,2,min)
+
+Errors<-rbind(minimum,Errors)
+
+Errors<-rbind(maximum,Errors)
+```
+
+```{r}
+radarchart(Errors,maxmin=TRUE,axistype=4,axislabcol="slategray4",
+           centerzero=FALSE,seg=8,cglcol="gray67",
+           pcol=c("dodgerblue2","firebrick2","darkorange2","darkorchid2"),
+           plty=1,
+           plwd=3,
+           title="Error comparison")
+
+legend <-legend(1.5,1, legend=c("ARIMAX(1,1,0)","ARIMA(1,2,4)"),
+                 seg.len=-1.4,
+                 title="Errors",
+                 pch=21, 
+                 bty="n" ,lwd=3, y.intersp=1, horiz=FALSE,
+                 col=c("dodgerblue2","firebrick2","darkorange2","darkorchid2"))
+```
+
+Conclusion: Keep model without temperature
+
+Make model with the overall series
+```{r}
+#Auto Arima for Chile:
+
+ARIMA_Final_Chile<-auto.arima(COVID_Day_series_Chile_Temp)
+summary(ARIMA_Final_Chile)
+```
+
+Final forecast:
+```{r}
+Future_Chile_Temp<-Chile_Temp$Temperature_Chile[Chile_Temp$Date>max(COVID_2$Date2)]
+
+P_CHL_Final<-forecast(ARIMA_Final_Chile,h=length(Future_Chile_Temp))
+Low_lim_CHL<-data.frame(P_CHL_Final$lower)[,2]
+Upp_lim_CHL<-data.frame(P_CHL_Final$upper)[,2]
+```
+
+For making the plot:
+```{r}
+##Data periods
+per_1 <- as.Date(as.character(COVID_2_Day_Chile_Temp$Date2))
+per_2 <- seq(as.Date(max(COVID_2_Day_Chile_Temp$Date2)+1,format="%Y-%m-%d"), as.Date("2020-04-30",format="%Y-%m-%d"),"1 day")
+
+
+# Merge forecast + actuals
+data <- xts(COVID_Day_series_Chile_Temp,order.by=per_1) 
+dataNA <- rep(NA, length(data))
+A <- cbind(data,dataNA,dataNA,dataNA)
+
+
+Low_lim_CHL <- xts(Low_lim_CHL,order.by=per_2)
+Forecast_CHL <- xts(P_CHL_Final$mean,order.by=per_2)
+Upp_lim_CHL <- xts(Upp_lim_CHL,order.by=per_2)
+predNA <- rep(NA, length(Forecast_CHL))
+B <- cbind(predNA, Low_lim_CHL, Forecast_CHL, Upp_lim_CHL)
+
+all_series_CHL <- data.frame(rbind(as.matrix(A),as.matrix(B)))
+colnames(all_series_CHL) <- c('Actual', 'Lower_limit', 'Forecast', 'Upper_limit')
+```
+
+```{r}
+dygraph(all_series_CHL, main="SARS-COV2-outbreak: Total Chile cases",xlab="Date", ylab="Novel coronavirus cases",width = 750)%>%
+  dySeries(c('Lower_limit', 'Forecast', 'Upper_limit'),label="Forecast",strokeWidth=2,
+           drawPoints = TRUE, pointSize = 2, color=rgb(196/255,60/255,44/255)) %>%
+  dySeries("Actual",drawPoints = TRUE, strokeWidth=2, pointSize = 2,
+           color=rgb(16/255,59/255,160/255)) %>% 
+  dyRangeSelector()
+
+```
 
 
 
 ```{r}
-#Forecasts<-list(all_series_CRI,all_series_MEX,all_series_ITA,all_series_LBN)
-#names(Forecasts)<-c("Costa Rica","Mexico","Italy","Lebanon")
+#Forecasts<-list(all_series_CRI,all_series_MEX,all_series_ITA,all_series_LBN,all_series_COL,
+                #all_series_CHL)
+#names(Forecasts)<-c("Costa Rica","Mexico","Italy","Lebanon","Colombia","Chile")
 #Forecasts$Mexico
 
 #save(Forecasts, file="Forecasts.RData")
