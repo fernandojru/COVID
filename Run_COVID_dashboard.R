@@ -1,0 +1,11 @@
+library(shinydashboard)
+library(shiny)
+library(leaflet)
+library(dplyr)
+library(xts)
+library(dygraphs)
+library(ggplot2)
+library(scales)
+library(plotly)
+
+runGitHub("fernandojru/COVID","fernandojru",subdir="Dashboard")
