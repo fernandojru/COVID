@@ -47,6 +47,7 @@ sidebar <- dashboardSidebar(
       )
 
 body <- dashboardBody(
+  tags$head(includeHTML("analytics_covid.html")),
   tabItems(
     tabItem(tabName = "overview",
             fluidRow(valueBoxOutput("Total_confirmed",width = 4),
