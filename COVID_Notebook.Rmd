@@ -1,6 +1,7 @@
 ---
 title: "COVID-19 Outbreak: Worldwide analysis"
 author: "Aoun, Camargo, Martinez, Rodriguez"
+date: "April 15th, 2020"
 output: 
   html_notebook:
     toc: true
@@ -17,7 +18,7 @@ output:
 
 ## Current status
 
-
+Load the requiered libraries for the analysis:
 ```{r,message=FALSE,warning=FALSE}
 #library(nCov2019)
 library(leaflet)
@@ -33,9 +34,10 @@ library(fmsb)
 library(forecast)
 ```
 
+Load the given data, and the one updated from [2019 Novel Coronavirus COVID-19 (2019-nCoV) Data Repository by Johns Hopkins CSSE](https://github.com/CSSEGISandData/COVID-19)
 ```{r}
 COVID<-read.csv("covid_19_data.csv")
-COVID_2<-read.csv("COVID19_13-Apr.csv")
+COVID_2<-read.csv("COVID19_14-Apr.csv")
 ```
 
 Format date:
@@ -45,10 +47,12 @@ Date<-as.Date(COVID_2$Date, format="%m/%d/%y")
 COVID_2$Date2<-Date
 ```
 
+Filter to obtain the last date:
 ```{r}
 COVID_updated<-COVID_2 %>% filter(Date2==max(Date2))
 ```
 
+World map cases:
 ```{r,warning=FALSE,message=FALSE}
 leaflet(width = "100%") %>% 
   addProviderTiles("CartoDB.DarkMatter") %>% 
@@ -64,7 +68,7 @@ leaflet(width = "100%") %>%
                    )
 ```
 
-Current top 10 countries:
+Current top 10 countries by cases:
 ```{r}
 COVID_top<-COVID_2 %>% filter(Date2==max(Date2)) %>% 
   group_by(Country.Region) %>% summarise(Total_confirmed=sum(Confirmed)) %>% 
@@ -85,7 +89,7 @@ plot<-ggplot(data=COVID_top
 ggplotly(plot,tooltip = c("x"),width=750)
 ```
 
-Time distribution:
+Time distribution of cases, deaths and recovered:
 ```{r}
 COVID_2_Day<- COVID_2 %>% group_by(Date2) %>% summarise(World_confirmed=sum(Confirmed),
                                                         World_deaths=sum(Deaths),
@@ -111,7 +115,7 @@ dygraph(Day_summary, main = "SARS-COV2-outbreak: Total worldwide cases",
   dyRangeSelector()
 ```
 
-
+Create a function to calculate new cases:
 ```{r}
 New_count<-function(x)
 {
@@ -134,6 +138,7 @@ COVID_New_recovered_series<-xts(New_recovered, order.by=COVID_2_Day$Date2)
 New_summary<-cbind(COVID_New_confirmed_series,COVID_New_deaths_series,COVID_New_recovered_series)
 ```
 
+New cases, deaths and recovered time distribution:
 ```{r}
 dygraph(New_summary, main = "SARS-COV2-outbreak: Total worldwide cases", 
         xlab="Date", ylab="Novel coronavirus cases",width = 750) %>% 
@@ -146,8 +151,7 @@ dygraph(New_summary, main = "SARS-COV2-outbreak: Total worldwide cases",
   dyRangeSelector()
 ```
 
-
-Team members countries total cases:
+Total cases by some countries time distribution:
 ```{r}
 COVID_2_Day_Lebanon<- COVID_2 %>% 
   filter(Country.Region %in% c("Lebanon")) %>% 
@@ -188,6 +192,7 @@ dygraph(Our_Countries, main = "SARS-COV2-outbreak: Total cases by country", xlab
   dyRangeSelector()
 ```
 
+New cases by some countries time distribution:
 ```{r}
 New_Lebanon<-New_count(COVID_2_Day_Lebanon$World_confirmed)
 New_Chile<-New_count(COVID_2_Day_Chile$World_confirmed)
@@ -217,6 +222,7 @@ dygraph(Our_New_Countries, main = "SARS-COV2-outbreak: New cases by country", xl
 
 # Looking for correlations
 
+3D scatterplot of confirmed cases Vs. Deaths Vs. Recovered, using the data for the last day
 ```{r}
 fig <- plot_ly(COVID_updated, x = ~Confirmed, y = ~Deaths, z = ~Recovered, width=750) %>% 
   add_markers(text= ~Country.Region ,hoverinfo= "text",
@@ -229,12 +235,17 @@ fig
 ```
 ## For the number of cases
 
+In this step, we will look for correlations of the number of cases of COVID-19, by some known indicators. Here **each individual of analysis (tuple) is a country**.
+
+
 ### Human Development Index
 
+The Human Development Index is calculated by the United Nations. And its located here: [United Nations Human Development reports](http://hdr.undp.org/en/data)
 ```{r}
 HDI<-read.csv("Human Development Index (HDI)_2.csv",sep=";",dec=",")
 ```
 
+Group data by country:
 ```{r}
 COVID_Country<-COVID_2 %>% filter(Date2==max(Date2)) %>% 
   group_by(Country.Region) %>% summarise(Total_confirmed=sum(Confirmed),
@@ -242,7 +253,7 @@ COVID_Country<-COVID_2 %>% filter(Date2==max(Date2)) %>%
                                          Total_Recovered=sum(Recovered))
 ```
 
-Remove after parentheses:
+Remove after parentheses: Use regular expresions to clean the countries name on the HDI file, this to use this variable as key to join with the COVID-19 countries table:
 ```{r}
 HDI$Country_2<-gsub("\\s*\\([^\\)]+\\)","",as.character(HDI$Country))
 ```
@@ -252,12 +263,14 @@ HDI$Country_2[HDI$Country_2=="United States"]<-"US"
 HDI$Country_2[HDI$Country_2=="Korea"]<-"South Korea"
 ```
 
-Population:
+Because the number of cases by country is clearly affected by the population (for example the number of cases in Lebanon is way smaller than the US, but Lebanon has 6M inhabitants and the US 330M), this variable was used to obtain the number of cases per million inhabitants.
+
+The data used is from the [World Bank indicators](https://data.worldbank.org/indicator/sp.pop.totl?end=2018&start=2018)
 ```{r}
 Population<-read.csv("World_population.csv",sep=";",dec=",")
 ```
 
-Remove after commma:
+Remove after commma: Use regular expresions to clean the countries name on the population file, this to use this variable as key to join with the COVID-19 countries table:
 ```{r}
 Population$Country_Name_2<-gsub(",.*", "", as.character(Population$Country_Name))
 ```
@@ -302,7 +315,7 @@ ggplotly(plot,tooltip = c("x"),width=750)
 ```
 
 
-Plot the Human Development Index(HDI) Vs. the number of cases (applying a log transformation), and the proportion of recovered cases:
+Plot the Human Development Index(HDI) Vs. the number of cases (applying a log transformation, to avoid effects of outliers), and the proportion of recovered cases:
 ```{r}
 plot<-ggplot(data=COVID_3,aes(x=log(Cases_million),y=Year_2018,
                         size=Recovered_percentage,text=Country.Region)) +
@@ -317,7 +330,7 @@ plot<-ggplot(data=COVID_3,aes(x=log(Cases_million),y=Year_2018,
 ggplotly(plot,tooltip = c("text"),width=750)
 ```
 
-
+Correlation matrix: 
 ```{r}
 COVID_numeric_1<-COVID_3 %>% mutate(Log_cases=log(Cases_million),
                                     Death_percentage=(Total_deaths/Total_confirmed)*100) %>% 
@@ -347,10 +360,12 @@ COVID_3<- COVID_3 %>% inner_join(Measles,by=c("Country.Region"="Country_2")) %>%
 
 ### Health expenditure (% of GDP)
 
+The next variable to consider is the percentage of the GDP that the countries spend on health, which is also available on [United Nations Human Development reports](http://hdr.undp.org/en/data) 
 ```{r}
 Health_expenditure<-read.csv("Health_expenditure_GDP.csv",sep=";",dec=".")
 ```
 
+Remove after parentheses: Use regular expresions to clean the countries name on the health expenditure file, this to use this variable as key to join with the COVID-19 countries table:
 ```{r}
 Health_expenditure$Country_2<-gsub("\\s*\\([^\\)]+\\)","",
                                    as.character(Health_expenditure$Country))
@@ -361,11 +376,12 @@ Health_expenditure$Country_2[Health_expenditure$Country_2=="United States"]<-"US
 Health_expenditure$Country_2[Health_expenditure$Country_2=="Korea"]<-"South Korea"
 ```
 
-
+Natural join of tables:
 ```{r}
 COVID_3<- COVID_3 %>% inner_join(Health_expenditure,by=c("Country.Region"="Country_2")) %>% select(-c("Country"))
 ```
 
+Plot the % of GDP spent on health Vs the Cases/1M population:
 ```{r}
 plot<-ggplot(data=COVID_3,aes(x=log(Cases_million),y=Expenditure_2016,
                         size=Recovered_percentage,text=Country.Region)) +
@@ -382,17 +398,21 @@ ggplotly(plot,tooltip = c("text"),width=750)
 
 ### Temperature
 
+Other variable to considered is the temperature of the countries. While the is no empirical evidence that the weather affects or helps the spread of the SARS-COV 2 virus. This [paper covers how generally, the weather had affected the spread of viral respiratory infections](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3311988/)
+
+This data contains the temperature (in celcius) of the first day of the month, for all countries since 1900, and it is available on this [Kaggle](https://www.kaggle.com/berkeleyearth/climate-change-earth-surface-temperature-data)
 ```{r}
 Temperature<-read.csv("GlobalLandTemperaturesByCountry.csv",sep=";")
 ```
 
+Format date:
 ```{r}
 Date_Temp<-as.Date(Temperature$dt, format="%d/%m/%Y") 
 
 Temperature$Date_Temp<-Date_Temp
 ```
 
-Extract month, filter IQ (Jan, Feb and Mar) and obtain the average IQ temperature:
+Extract month and filter for IQ (Jan, Feb and Mar), because that are the months our COVID data is available, and obtain the average IQ temperature:
 ```{r}
 Temperature<- Temperature %>% mutate(Month=month(Temperature$Date_Temp,label =TRUE),
                                      Year=year(Temperature$Date_Temp)) %>% 
@@ -402,6 +422,7 @@ Temperature<- Temperature %>% mutate(Month=month(Temperature$Date_Temp,label =TR
 Temperature<-Temperature[!is.na(Temperature$Avg_IQ_temperature),]
 ```
 
+Regular expressions to clean the countries name:
 ```{r}
 Temperature$Country_2<-gsub("\\s*\\([^\\)]+\\)","",
                                    as.character(Temperature$Country))
@@ -412,12 +433,14 @@ Temperature$Country_2[Temperature$Country_2=="United States"]<-"US"
 Temperature$Country_2[Temperature$Country_2=="Korea"]<-"South Korea"
 ```
 
+Join tables:
 ```{r}
 COVID_3<- COVID_3 %>% inner_join(Temperature,by=c("Country.Region"="Country_2")) %>% select(-c("Country"))
 
 #write.csv(COVID_3,"COVID_Covariables.csv")
 ```
 
+Plot the average temperature of the first quarter Vs. the cases/1M habitants:
 ```{r}
 plot<-ggplot(data=COVID_3,aes(x=log(Cases_million),y=Avg_IQ_temperature,
                         size=Recovered_percentage,text=Country.Region)) +
@@ -434,13 +457,16 @@ ggplotly(plot,tooltip = c("text"),width=750)
 
 ## For the number of deaths
 
-###DTP immunization
+This step is similar to the previous one, where **each individual of analysis (tuple) is a country**, but here we are considering the **death rate percentage.**
 
+### DTP immunization
+
+The DTP is a class of combination vaccines against three infectious diseases in humans: diphtheria, pertussis (whooping cough), and tetanus, the data is also available on the [United Nations Human Development reports](http://hdr.undp.org/en/data)
 ```{r}
 DTP_immunization<-read.csv("Infants_lacking_immunization_DTP.csv",sep=";")
 ```
 
-Remove after parentheses:
+Remove after parentheses: regular expression cleaning
 ```{r}
 DTP_immunization$Country_2<-gsub("\\s*\\([^\\)]+\\)","",
                                  as.character(DTP_immunization$Country))
@@ -452,7 +478,7 @@ DTP_immunization$Country_2[DTP_immunization$Country_2=="United States"]<-"US"
 DTP_immunization$Country_2[DTP_immunization$Country_2=="Korea"]<-"South Korea"
 ```
 
-
+Join tables:
 ```{r,warning=FALSE,message=FALSE}
 COVID_4<- COVID_Country %>% inner_join(DTP_immunization,
                                        by=c("Country.Region"="Country_2")) %>% 
@@ -462,6 +488,7 @@ COVID_4<- COVID_Country %>% inner_join(DTP_immunization,
          Death_rate=(Total_deaths/Total_confirmed)*100)
 ```
 
+Plot the death rate Vs. % of infants lacking DTP immunization:
 ```{r}
 plot<-ggplot(data=COVID_4,aes(x=Death_rate,y=Lack_DTP_inmmunization_2018,
                         size=Recovered_percentage,text=Country.Region)) +
@@ -478,11 +505,13 @@ ggplotly(plot,tooltip = c("text"),width=750)
 
 ### Infants lacking immunization, measles (% of one-year-olds)
 
+The next vaccine that was evaluated was measles, the data is also available on the [United Nations Human Development reports](http://hdr.undp.org/en/data)
+
 ```{r}
 COVID_4<- COVID_4 %>% inner_join(Measles,by=c("Country.Region"="Country_2")) %>% select(-c("Country"))
 ```
 
-
+See the distribution of the % od infants lacking measles vaccine, the median of this variable is below 10%, with some outliers over 40% in some countries
 ```{r}
 ggplot(COVID_4, aes(y=Measles_2018)) + 
   geom_boxplot(fill="dodgerblue4",outlier.shape = 21, 
@@ -491,6 +520,7 @@ ggplot(COVID_4, aes(y=Measles_2018)) +
   theme_minimal()
 ```
 
+Histogram:
 ```{r}
 ggplot(COVID_4, aes(Measles_2018)) + 
   geom_histogram(fill="dodgerblue4",bins=20,alpha=0.8) +
@@ -500,6 +530,7 @@ ggplot(COVID_4, aes(Measles_2018)) +
   theme_minimal()
 ```
 
+Plot % of infants lacking this immunization vs the fatality rate:
 ```{r}
 plot<-ggplot(data=COVID_4,aes(x=Death_rate,y=Measles_2018,
                         size=Recovered_percentage,text=Country.Region)) +
@@ -517,29 +548,49 @@ ggplotly(plot,tooltip = c("text"),width=750)
 
 # Fitting a regression model
 
-Transforming with ln and converting temperature as kelvin:
+Here the **individuals of analysis (tuples) will be each country**, the **response variable will be the cases per million inhabitants**, and the explanatory variables showed before. 
+
+Because of the presence of extreme cases per million inhabitants in some countries, it is convenient to make a ln transformation, and because some temperatures are below 0 celcius, they will be converted to kelvin (adding 273.5) to the celcius temperature.
+
+First model:
 ```{r}
 Mod1<-lm(log(COVID_3$Cases_million)~log(COVID_3$Year_2018)+log(COVID_3$Measles_2018)+
            log(COVID_3$Expenditure_2016)+log(COVID_3$Avg_IQ_temperature+273.15))
 summary(Mod1)
 ```
 
-Stepwise with AIC critertion:
+Stepwise with AIC criterion, to see which variables are better:
 ```{r}
 Mod2<-step(Mod1,direction = "both")
 ```
 
+Final model:
 ```{r}
 summary(Mod2)
 ```
 
+According to the AIC criterion, a model with HDI, % spent on health and average temperature is better:
+
 Normality of residuals:
 ```{r}
-hist(Mod2$residuals)
+Model_residuals<-data.frame(Residuals=Mod2$residuals)
+ggplot(Model_residuals, aes(Residuals)) + 
+  geom_histogram(fill="dodgerblue4",bins=18,alpha=0.8) +
+  ggtitle("Histogram of model residuals") + 
+  xlab("Residuals") + 
+  ylab("Frequency") +
+  theme_minimal()
+
 shapiro.test(Mod2$residuals)
 ```
 
-Prediction power: separate between training and testing:
+By analysing the histogram, and using the Shapiro-Wilk test, there is not enough statistical evidence to reject the null hypothesis that the residuals of the model are following a normal distribution. Normal distribution is assumed.
+
+## Prediction power
+
+Evaluate if a model with temperature Vs. a one without temperature.
+
+Separate between training and testing:
 ```{r}
 set.seed(179819)
 Sample <- sample(1:length(COVID_3$Cases_million),length(COVID_3$Cases_million)*0.20)
@@ -611,7 +662,7 @@ RelativeError_Mod3<-RelativeError(Pred,t.testing$Cases_million_log)
 Mod3_Errors<-c(RSS_Mod3,RSE_Mod3,MSE_Mod3,RelativeError_Mod3)
 ```
 
-Now, a model without temperature:
+Now, a **model without temperature:**
 ```{r}
 t.training <- t.training %>% select(-Temperature_log_kelvin)
 t.testing <- t.testing %>% select(-Temperature_log_kelvin)
@@ -637,7 +688,7 @@ RelativeError_Mod4<-RelativeError(Pred,t.testing$Cases_million_log)
 Mod4_Errors<-c(RSS_Mod4,RSE_Mod4,MSE_Mod4,RelativeError_Mod4)
 ```
 
-Create a radarplot:
+Create a radarplot to easily compare errors:
 ```{r}
 Errors<-rbind(Mod3_Errors,Mod4_Errors)
 
@@ -672,7 +723,14 @@ legend <-legend(1.5,1, legend=c("With temperature","Without temperature"),
                  col=c("dodgerblue2","firebrick2","darkorange2","darkorchid2"))
 ```
 
+Therefore, a model without temperature is better. **But because temperature was included using the stepwise AIC criterion, and because its coefficient was significant (at an alpha of 10%), it will be considered for the day-to-day forecast**
+
+
 # Forecast by country
+
+For each of the following countries, the best suitable ARIMA model will be fitted, **and its prediction power will be compared (a model with temperature and a model without)**
+
+The weather considered for these models will be the maximum presented and forecasted in [AccuWeather](https://www.accuweather.com)
 
 ## Republic of Costa Rica
 
@@ -686,6 +744,10 @@ CostaRica_Temp$Date<-as.Date(CostaRica_Temp$Date,format="%d/%m/%Y")
 ```
 
 ```{r}
+COVID_2_Day_CostaRica<- COVID_2 %>% 
+  filter(Country.Region %in% c("Costa Rica")) %>% 
+  group_by(Date2) %>% summarise(World_confirmed=sum(Confirmed))
+
 COVID_2_Day_CostaRica_Temp<-COVID_2_Day_CostaRica %>%
   inner_join(CostaRica_Temp,by=c("Date2"="Date"))
 
@@ -697,22 +759,21 @@ COVID_series_CostaRica_Temp_Train<-COVID_Day_series_CostaRica_Temp[1:64] #Until 
 COVID_series_CostaRica_Temp_Test<-COVID_Day_series_CostaRica_Temp[65:length(COVID_Day_series_CostaRica_Temp)] #From March 26th onwards
 ```
 
-Get the lagged difference:
+Get the differentiated series: In this case until a second difference was suitable
 ```{r}
-plot(diff(COVID_series_CostaRica_Temp_Train),type="l",main="1st ") 
+plot(diff(diff(COVID_series_CostaRica_Temp_Train)),type="l",main="Costa Rica: 2nd difference") 
 ```
 
-Correlograms of first diference:
+Correlograms of second diference:
 ```{r}
-tsdisplay(diff(COVID_series_CostaRica_Temp_Train))
+tsdisplay(diff(diff(COVID_series_CostaRica_Temp_Train)), main="Costa Rica ACF and PACF correlograms")
 ```
 
+By analyzing the autocorrelation and partial autocorrelation function plots. A model with 1 autoregressive term, and one moving average term will be fitted
 Arima model: ARIMA(1,2,1)
 ```{r}
-#Auto Arima for Costa Rica:
+ARIMA1_CostaRica<-Arima(COVID_series_CostaRica_Temp_Train,order=c(1,2,1),xreg=COVID_2_Day_CostaRica_Temp$Temperature_CostaRica[1:64])
 
-ARIMA1_CostaRica<-auto.arima(COVID_series_CostaRica_Temp_Train,
-                             xreg = COVID_2_Day_CostaRica_Temp$Temperature_CostaRica[1:64])
 summary(ARIMA1_CostaRica)
 ```
 
@@ -750,7 +811,7 @@ PFA <- function(Fore,Actual) {
 }
 ```
 
-Forecast prediction to compare
+Forecast prediction to compare:
 ```{r}
 Test_CostaRica_Temp<-COVID_2_Day_CostaRica_Temp$Temperature_CostaRica[65:length(COVID_Day_series_CostaRica_Temp)]
 
@@ -769,22 +830,12 @@ Errors.CRI_1<-c(RE_CRI_1,MAPE_CRI_1,MSE_CRI_1,PFA_CRI_1)
 Errors.CRI_1
 ```
 
-Manual MAPE:
-```{r}
-dd<-data.frame(Actual=as.vector(COVID_series_CostaRica_Temp_Test),
-               Fore=P_CRI_1$mean
-)
-dd<-dd %>% mutate(Abs_Per_Error=abs(Actual-Fore)/abs(Actual))
-mean(dd$Abs_Per_Error)*100
-```
-
 *Model without temperature*
 
 ARIMA(1,2,0)
 ```{r}
-#Auto Arima for Costa Rica:
+ARIMA2_CostaRica<-Arima(COVID_series_CostaRica_Temp_Train,order=c(1,2,0))
 
-ARIMA2_CostaRica<-auto.arima(COVID_series_CostaRica_Temp_Train)
 summary(ARIMA2_CostaRica)
 ```
 
@@ -828,7 +879,7 @@ radarchart(Errors,maxmin=TRUE,axistype=4,axislabcol="slategray4",
            pcol=c("dodgerblue2","firebrick2","darkorange2","darkorchid2"),
            plty=1,
            plwd=3,
-           title="Error comparison")
+           title="Costa Rica forecast: error comparison on test set")
 
 legend <-legend(1.5,1, legend=c("ARIMAX(1,2,1)","ARIMA(1,2,0)"),
                  seg.len=-1.4,
@@ -838,14 +889,11 @@ legend <-legend(1.5,1, legend=c("ARIMAX(1,2,1)","ARIMA(1,2,0)"),
                  col=c("dodgerblue2","firebrick2","darkorange2","darkorchid2"))
 ```
 
-Conclusion: Keep model with temperature
+Conclusion: Keep model without temperature
 
 Make model with the overall series
 ```{r}
-#Auto Arima for Costa Rica:
-
-ARIMA_Final_CostaRica<-auto.arima(COVID_Day_series_CostaRica_Temp,
-                             xreg = COVID_2_Day_CostaRica_Temp$Temperature_CostaRica)
+ARIMA_Final_CostaRica<-Arima(COVID_Day_series_CostaRica_Temp,order=c(0,2,1))
 summary(ARIMA_Final_CostaRica)
 ```
 
@@ -853,7 +901,7 @@ Final forecast:
 ```{r}
 Future_CostaRica_Temp<-CostaRica_Temp$Temperature_CostaRica[CostaRica_Temp$Date>max(COVID_2$Date2)]
 
-P_CRI_Final<-forecast(ARIMA_Final_CostaRica,xreg = Future_CostaRica_Temp)
+P_CRI_Final<-forecast(ARIMA_Final_CostaRica,h = length(Future_CostaRica_Temp))
 Low_lim_CRI<-data.frame(P_CRI_Final$lower)[,2]
 Upp_lim_CRI<-data.frame(P_CRI_Final$upper)[,2]
 ```
@@ -918,22 +966,21 @@ COVID_series_Mexico_Train<-COVID_Day_series_Mexico_Temp[1:74] #Until April 4th
 COVID_series_Mexico_Test<-COVID_Day_series_Mexico_Temp[75:length(COVID_Day_series_Mexico_Temp)] #From April 5th onwards
 ```
 
-Get the lagged difference:
+Get the differentiated series: In this case until a second difference was suitable
 ```{r}
-plot(diff(COVID_series_Mexico_Train),type="l",main="1st ") 
+plot(diff(diff(COVID_series_Mexico_Train)),type="l",main="Mexico: 2nd difference") 
 ```
 
-Correlograms of first diference:
+Correlograms of second diference:
 ```{r}
-tsdisplay(diff(COVID_series_Mexico_Train))
+tsdisplay(diff(diff(COVID_series_Mexico_Train)),main="Mexico ACF and PACF correlograms")
 ```
+By analyzing the autocorrelation and partial autocorrelation function plots. A model with 2 autoregressive terms, and 3 moving average terms will be fitted
+
+
 
 Arima model: ARIMA(2,2,3)
 ```{r}
-#Auto Arima for Mexico:
-
-#ARIMA1_Mexico<-auto.arima(COVID_series_Mexico_Train,
-                             #xreg = COVID_2_Day_Mexico_Temp$Temperature_Mexico[1:74])
 ARIMA1_Mexico<-Arima(COVID_series_Mexico_Train,order=c(2,2,3),xreg=COVID_2_Day_Mexico_Temp$Temperature_Mexico[1:74])
 summary(ARIMA1_Mexico)
 ```
@@ -957,22 +1004,12 @@ Errors.MEX_1<-c(RE_MEX_1,MAPE_MEX_1,MSE_MEX_1,PFA_MEX_1)
 Errors.MEX_1
 ```
 
-Manual MAPE:
-```{r}
-dd<-data.frame(Actual=as.vector(COVID_series_Mexico_Test),
-               Fore=P_MEX_1$mean
-)
-dd<-dd %>% mutate(Abs_Per_Error=abs(Actual-Fore)/abs(Actual))
-mean(dd$Abs_Per_Error)*100
-```
-
 *Model without temperature*
 
 ARIMA(2,2,4)
 ```{r}
-#Auto Arima for Mexico:
+ARIMA2_Mexico<-Arima(COVID_series_Mexico_Train,order=c(2,2,4))
 
-ARIMA2_Mexico<-auto.arima(COVID_series_Mexico_Train)
 summary(ARIMA2_Mexico)
 ```
 
@@ -1016,7 +1053,7 @@ radarchart(Errors,maxmin=TRUE,axistype=4,axislabcol="slategray4",
            pcol=c("dodgerblue2","firebrick2","darkorange2","darkorchid2"),
            plty=1,
            plwd=3,
-           title="Error comparison")
+           title="Mexico forecast: error comparison on test set")
 
 legend <-legend(1.5,1, legend=c("ARIMAX(2,2,3)","ARIMA(2,2,4)"),
                  seg.len=-1.4,
@@ -1030,10 +1067,8 @@ Conclusion: Keep model with temperature
 
 Make model with the overall series
 ```{r}
-#Auto Arima for Mexico:
+ARIMA_Final_Mexico<-Arima(COVID_Day_series_Mexico_Temp,order=c(2,2,1),xreg=COVID_2_Day_Mexico_Temp$Temperature_Mexico)
 
-ARIMA_Final_Mexico<-auto.arima(COVID_Day_series_Mexico_Temp,
-                             xreg = COVID_2_Day_Mexico_Temp$Temperature_Mexico)
 summary(ARIMA_Final_Mexico)
 ```
 
@@ -1108,21 +1143,20 @@ COVID_Day_series_Italy_Test<-COVID_Day_series_Italy_Temp[65:length(COVID_Day_ser
 
 Get the lagged difference:
 ```{r}
-plot(diff(COVID_Day_series_Italy_Train),type="l",main="1st ") 
+plot(diff(diff(COVID_Day_series_Italy_Train)),type="l",main="Italy: 2nd difference") 
 ```
 
 Correlograms of first diference:
 ```{r}
-tsdisplay(diff(COVID_Day_series_Italy_Train))
+tsdisplay(diff(diff(COVID_Day_series_Italy_Train)),main="Italy ACF and PACF correlograms")
 ```
+By analyzing the autocorrelation and partial autocorrelation function plots. A model with 1 autoregressive term will be fitted.
+
 
 Arima model: ARIMA(1,2,0)
 ```{r}
-#Auto Arima for Italy:
+ARIMA1_Italy<-Arima(COVID_Day_series_Italy_Train,order=c(1,2,0),xreg=COVID_2_Day_Italy_Temp$Temperature_Italy[1:64])
 
-ARIMA1_Italy<-auto.arima(COVID_Day_series_Italy_Train,
-                             xreg = COVID_2_Day_Italy_Temp$Temperature_Italy[1:64])
-#ARIMA1_Mexico<-Arima(COVID_series_Mexico_Train,order=c(2,2,3),xreg=COVID_2_Day_Mexico_Temp$Temperature_Mexico[1:74])
 summary(ARIMA1_Italy)
 ```
 
@@ -1145,21 +1179,11 @@ Errors.ITA_1<-c(RE_ITA_1,MAPE_ITA_1,MSE_ITA_1,PFA_ITA_1)
 Errors.ITA_1
 ```
 
-Manual MAPE:
-```{r}
-dd<-data.frame(Actual=as.vector(COVID_Day_series_Italy_Test),
-               Fore=P_ITA_1$mean
-)
-dd<-dd %>% mutate(Abs_Per_Error=abs(Actual-Fore)/abs(Actual))
-mean(dd$Abs_Per_Error)*100
-```
-
 *Model without temperature*
 
 ARIMA(1,2,0)
 ```{r}
-#Auto Arima for Italy:
-ARIMA2_Italy<-auto.arima(COVID_Day_series_Italy_Train)
+ARIMA2_Italy<-Arima(COVID_Day_series_Italy_Train,order=c(1,2,0))
 summary(ARIMA2_Italy)
 ```
 
@@ -1203,7 +1227,7 @@ radarchart(Errors,maxmin=TRUE,axistype=4,axislabcol="slategray4",
            pcol=c("dodgerblue2","firebrick2","darkorange2","darkorchid2"),
            plty=1,
            plwd=3,
-           title="Error comparison")
+           title="Italy forecast: error comparison on test set")
 
 legend <-legend(1.5,1, legend=c("ARIMAX(1,2,0)","ARIMA(1,2,0)"),
                  seg.len=-1.4,
@@ -1217,9 +1241,7 @@ Conclusion: Keep model without temperature
 
 Make model with the overall series
 ```{r}
-#Auto Arima for Italy:
-
-ARIMA_Final_Italy<-auto.arima(COVID_Day_series_Italy_Temp)
+ARIMA_Final_Italy<-Arima(COVID_Day_series_Italy_Temp,order=c(1,2,0))
 summary(ARIMA_Final_Italy)
 ```
 
@@ -1293,23 +1315,20 @@ COVID_series_Lebanon_Train<-COVID_Day_series_Lebanon_Temp[1:74] #Until April 4th
 COVID_series_Lebanon_Test<-COVID_Day_series_Lebanon_Temp[75:length(COVID_Day_series_Lebanon_Temp)] #From April 4th onwards
 ```
 
-Get the lagged difference:
+Get the differentiated series: In this case until a first difference was suitable
 ```{r}
-plot(diff(COVID_series_Lebanon_Train),type="l",main="1st ") 
+plot(diff(COVID_series_Lebanon_Train),type="l",main="Lebanon: 1st difference") 
 ```
 
 Correlograms of first diference:
 ```{r}
-tsdisplay(diff(COVID_series_Lebanon_Train))
+tsdisplay(diff(COVID_series_Lebanon_Train),main="Lebanon ACF and PACF correlograms")
 ```
 
 Arima model: ARIMA(1,1,2)
 ```{r}
-#Auto Arima for Lebanon:
+ARIMA1_Lebanon<-Arima(COVID_series_Lebanon_Train,order=c(1,1,2),xreg=COVID_2_Day_Lebanon_Temp$Temperature_Lebanon[1:74])
 
-ARIMA1_Lebanon<-auto.arima(COVID_series_Lebanon_Train,
-                             xreg = COVID_2_Day_Lebanon_Temp$Temperature_Lebanon[1:74])
-#ARIMA1_Mexico<-Arima(COVID_series_Mexico_Train,order=c(2,2,3),xreg=COVID_2_Day_Mexico_Temp$Temperature_Mexico[1:74])
 summary(ARIMA1_Lebanon)
 ```
 
@@ -1332,21 +1351,13 @@ Errors.LBN_1<-c(RE_LBN_1,MAPE_LBN_1,MSE_LBN_1,PFA_LBN_1)
 Errors.LBN_1
 ```
 
-Manual MAPE:
-```{r}
-dd<-data.frame(Actual=as.vector(COVID_series_Lebanon_Test),
-               Fore=P_LBN_1$mean
-)
-dd<-dd %>% mutate(Abs_Per_Error=abs(Actual-Fore)/abs(Actual))
-mean(dd$Abs_Per_Error)*100
-```
-
 *Model without temperature*
 
 ARIMA(0,2,2)
 ```{r}
 #Auto Arima for Lebanon:
-ARIMA2_Lebanon<-auto.arima(COVID_series_Lebanon_Train)
+ARIMA2_Lebanon<-Arima(COVID_series_Lebanon_Train,order=c(0,2,2))
+
 summary(ARIMA2_Lebanon)
 ```
 
@@ -1390,7 +1401,7 @@ radarchart(Errors,maxmin=TRUE,axistype=4,axislabcol="slategray4",
            pcol=c("dodgerblue2","firebrick2","darkorange2","darkorchid2"),
            plty=1,
            plwd=3,
-           title="Error comparison")
+           title="Lebanon forecast: error comparison on test set")
 
 legend <-legend(1.5,1, legend=c("ARIMAX(1,1,2)","ARIMA(0,2,2)"),
                  seg.len=-1.4,
@@ -1404,9 +1415,7 @@ Conclusion: Keep model without temperature
 
 Make model with the overall series
 ```{r}
-#Auto Arima for Lebanon:
-
-ARIMA_Final_Lebanon<-auto.arima(COVID_Day_series_Lebanon_Temp)
+ARIMA_Final_Lebanon<-Arima(COVID_Day_series_Lebanon_Temp,order=c(2,2,0))
 summary(ARIMA_Final_Lebanon)
 ```
 
@@ -1479,23 +1488,22 @@ COVID_series_Colombia_Train<-COVID_Day_series_Colombia_Temp[1:74] #Until April 4
 COVID_series_Colombia_Test<-COVID_Day_series_Colombia_Temp[75:length(COVID_Day_series_Colombia_Temp)] #From April 5th onwards
 ```
 
-Get the lagged difference:
+Get the differentiated series: In this case until a second difference was suitable
 ```{r}
-plot(diff(COVID_series_Colombia_Train),type="l",main="1st ") 
+plot(diff(diff(COVID_series_Colombia_Train)),type="l",main="Colombia: 2nd difference") 
 ```
 
-Correlograms of first diference:
+Correlograms of second diference:
 ```{r}
-tsdisplay(diff(COVID_series_Colombia_Train))
+tsdisplay(diff(diff(COVID_series_Colombia_Train)), main="Colombia ACF and PACF correlograms")
 ```
+By analyzing the autocorrelation and partial autocorrelation function plots. A model with 2 autoregressive terms, and 2 moving average terms will be fitted
 
-Arima model: ARIMA(2,2,2)
+
+Arimax model: ARIMAX(2,2,2)
 ```{r}
-#Auto Arima for Colombia:
+ARIMA1_Colombia<-Arima(COVID_series_Colombia_Train,order=c(2,2,2),xreg=COVID_2_Day_Colombia_Temp$Temperature_Colombia[1:74])
 
-ARIMA1_Colombia<-auto.arima(COVID_series_Colombia_Train,
-                             xreg = COVID_2_Day_Colombia_Temp$Temperature_Colombia[1:74])
-#ARIMA1_Mexico<-Arima(COVID_series_Mexico_Train,order=c(2,2,3),xreg=COVID_2_Day_Mexico_Temp$Temperature_Mexico[1:74])
 summary(ARIMA1_Colombia)
 ```
 
@@ -1518,21 +1526,12 @@ Errors.COL_1<-c(RE_COL_1,MAPE_COL_1,PFA_COL_1,MSE_COL_1)
 Errors.COL_1
 ```
 
-Manual MAPE:
-```{r}
-dd<-data.frame(Actual=as.vector(COVID_series_Colombia_Test),
-               Fore=P_COL_1$mean
-)
-dd<-dd %>% mutate(Abs_Per_Error=abs(Actual-Fore)/abs(Actual))
-mean(dd$Abs_Per_Error)*100
-```
-
 *Model without temperature*
 
 ARIMA(2,2,2)
 ```{r}
-#Auto Arima for Colombia:
-ARIMA2_Colombia<-auto.arima(COVID_series_Colombia_Train)
+ARIMA2_Colombia<-Arima(COVID_series_Colombia_Train,order=c(2,2,2))
+
 summary(ARIMA2_Colombia)
 ```
 
@@ -1576,7 +1575,7 @@ radarchart(Errors,maxmin=TRUE,axistype=4,axislabcol="slategray4",
            pcol=c("dodgerblue2","firebrick2","darkorange2","darkorchid2"),
            plty=1,
            plwd=3,
-           title="Error comparison")
+           title="Colombia forecast: error comparison on test set")
 
 legend <-legend(1.5,1, legend=c("ARIMAX(2,2,2)","ARIMA(2,2,2)"),
                  seg.len=-1.4,
@@ -1590,9 +1589,9 @@ Conclusion: Keep model without temperature
 
 Make model with the overall series
 ```{r}
-#Auto Arima for Colombia:
+ARIMA_Final_Colombia<-Arima(COVID_Day_series_Colombia_Temp,order=c(5,2,1))
 
-ARIMA_Final_Colombia<-auto.arima(COVID_Day_series_Colombia_Temp)
+
 summary(ARIMA_Final_Colombia)
 ```
 
@@ -1665,23 +1664,21 @@ COVID_series_Chile_Train<-COVID_Day_series_Chile_Temp[1:76] #Until April 6th
 COVID_series_Chile_Test<-COVID_Day_series_Chile_Temp[77:length(COVID_Day_series_Chile_Temp)] #From April 7th onwards
 ```
 
-Get the lagged difference:
+Get the differentiated series: In this case a first difference was suitable
 ```{r}
-plot(diff(COVID_series_Chile_Train),type="l",main="1st ") 
+plot(diff(COVID_series_Chile_Train),type="l",main="Chile: 1st difference") 
 ```
 
 Correlograms of first diference:
 ```{r}
-tsdisplay(diff(COVID_series_Chile_Train))
+tsdisplay(diff(COVID_series_Chile_Train),main="Chile ACF and PACF correlograms")
 ```
+By analyzing the autocorrelation and partial autocorrelation function plots. A model with 1 autoregressive term will be fitted.
 
 Arima model: ARIMA(1,1,0)
 ```{r}
-#Auto Arima for Chile:
+ARIMA1_Chile<-Arima(COVID_series_Chile_Train,order=c(1,1,0),xreg=COVID_2_Day_Chile_Temp$Temperature_Chile[1:76])
 
-ARIMA1_Chile<-auto.arima(COVID_series_Chile_Train,
-                             xreg = COVID_2_Day_Chile_Temp$Temperature_Chile[1:76])
-#ARIMA1_Mexico<-Arima(COVID_series_Mexico_Train,order=c(2,2,3),xreg=COVID_2_Day_Mexico_Temp$Temperature_Mexico[1:74])
 summary(ARIMA1_Chile)
 ```
 
@@ -1704,21 +1701,11 @@ Errors.CHL_1<-c(RE_CHL_1,MAPE_CHL_1,MSE_CHL_1,PFA_CHL_1)
 Errors.CHL_1
 ```
 
-Manual MAPE:
-```{r}
-dd<-data.frame(Actual=as.vector(COVID_series_Chile_Test),
-               Fore=P_CHL_1$mean
-)
-dd<-dd %>% mutate(Abs_Per_Error=abs(Actual-Fore)/abs(Actual))
-mean(dd$Abs_Per_Error)*100
-```
-
 *Model without temperature*
 
 ARIMA(1,2,4)
 ```{r}
-#Auto Arima for Colombia:
-ARIMA2_Chile<-auto.arima(COVID_series_Chile_Train)
+ARIMA2_Chile<-Arima(COVID_series_Chile_Train,order=c(1,2,4))
 summary(ARIMA2_Chile)
 ```
 
@@ -1762,7 +1749,7 @@ radarchart(Errors,maxmin=TRUE,axistype=4,axislabcol="slategray4",
            pcol=c("dodgerblue2","firebrick2","darkorange2","darkorchid2"),
            plty=1,
            plwd=3,
-           title="Error comparison")
+           title="Chile forecast: error comparison on test set")
 
 legend <-legend(1.5,1, legend=c("ARIMAX(1,1,0)","ARIMA(1,2,4)"),
                  seg.len=-1.4,
@@ -1776,9 +1763,7 @@ Conclusion: Keep model without temperature
 
 Make model with the overall series
 ```{r}
-#Auto Arima for Chile:
-
-ARIMA_Final_Chile<-auto.arima(COVID_Day_series_Chile_Temp)
+ARIMA_Final_Chile<-Arima(COVID_Day_series_Chile_Temp,order=c(0,2,1))
 summary(ARIMA_Final_Chile)
 ```
 
@@ -1825,14 +1810,26 @@ dygraph(all_series_CHL, main="SARS-COV2-outbreak: Total Chile cases",xlab="Date"
 ```
 
 
-
-```{r}
+```{r,echo=FALSE}
 #Forecasts<-list(all_series_CRI,all_series_MEX,all_series_ITA,all_series_LBN,all_series_COL,
-                #all_series_CHL)
+ #               all_series_CHL)
 #names(Forecasts)<-c("Costa Rica","Mexico","Italy","Lebanon","Colombia","Chile")
 #Forecasts$Mexico
 
 #save(Forecasts, file="Forecasts.RData")
 ```
 
+# References
+
+* [2019 Novel Coronavirus COVID-19 (2019-nCoV) Data Repository by Johns Hopkins CSSE](https://github.com/CSSEGISandData/COVID-19)
+
+* [United Nations Human Development reports](http://hdr.undp.org/en/data)
+
+* [World Bank indicators](https://data.worldbank.org/indicator/sp.pop.totl?end=2018&start=2018)
+
+* [Environmental factors affecting the transmission of respiratory viruses, Pica & Bouvier](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3311988/)
+
+* [Kaggle](https://www.kaggle.com/berkeleyearth/climate-change-earth-surface-temperature-data)
+
+* [AccuWeather](https://www.accuweather.com)
 
