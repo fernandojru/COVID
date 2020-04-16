@@ -1,7 +1,7 @@
 ---
 title: "COVID-19 Outbreak: Worldwide analysis"
 author: "Aoun, Camargo, Martinez, Rodriguez"
-date: "April 15th, 2020"
+date: "April 16th, 2020"
 output: 
   html_notebook:
     toc: true
@@ -37,7 +37,7 @@ library(forecast)
 Load the given data, and the one updated from [2019 Novel Coronavirus COVID-19 (2019-nCoV) Data Repository by Johns Hopkins CSSE](https://github.com/CSSEGISandData/COVID-19)
 ```{r}
 COVID<-read.csv("covid_19_data.csv")
-COVID_2<-read.csv("COVID19_14-Apr.csv")
+COVID_2<-read.csv("COVID19_15-Apr.csv")
 ```
 
 Format date:
@@ -1812,9 +1812,9 @@ dygraph(all_series_CHL, main="SARS-COV2-outbreak: Total Chile cases",xlab="Date"
 
 ```{r,echo=FALSE}
 #Forecasts<-list(all_series_CRI,all_series_MEX,all_series_ITA,all_series_LBN,all_series_COL,
- #               all_series_CHL)
+                #all_series_CHL)
 #names(Forecasts)<-c("Costa Rica","Mexico","Italy","Lebanon","Colombia","Chile")
-#Forecasts$Mexico
+
 
 #save(Forecasts, file="Forecasts.RData")
 ```
