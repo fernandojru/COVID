@@ -16,6 +16,7 @@ Daily
 ### Deliverables:
 * Dashboard, which can also be obtained by executing the following on R console:
 
+``` r
 library(shinydashboard)
 library(shiny)
 library(leaflet)
@@ -27,6 +28,8 @@ library(scales)
 library(plotly)
 
 runGitHub("fernandojru/COVID","fernandojru",subdir="Dashboard")
+```
+
 
 * Notebook with data cleaning, processing, EDA and feature engineering
 
