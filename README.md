@@ -14,7 +14,7 @@
 Daily
 
 ### Deliverables:
-* Dashboard, which can also be obtained by executing the following on R console:
+* Dashboard that can be access directly [HERE](https://fernandojru.shinyapps.io/COVID19_dashboard/) or could also be obtained by executing the following on R console:
 
 ``` r
 library(shinydashboard)
